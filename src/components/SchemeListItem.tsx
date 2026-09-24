@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Chip,
   Collapse,
@@ -10,7 +11,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import GpsFixedIcon from "@mui/icons-material/GpsFixed";
 import { CAT_LABEL, type Scheme } from "../data/schemes";
 import { byId, incoming, type PathUnion } from "../lib/graph";
-import { hopBadges, type AimMode } from "../lib/badges";
+import { hopBadges, schemeRowState, type AimMode } from "../lib/badges";
 
 interface SchemeListItemProps {
   scheme: Scheme;
@@ -71,6 +72,13 @@ export default function SchemeListItem({
   onToggleExpand,
   onToggleAim,
 }: SchemeListItemProps) {
+  const rowState = schemeRowState(
+    scheme.id,
+    mode,
+    targets,
+    distMaps,
+    pathUnion,
+  );
   const badges = hopBadges(scheme.id, mode, targets, distMaps, pathUnion);
   const catColor = `var(--cat-${scheme.cat})`;
 
@@ -81,7 +89,7 @@ export default function SchemeListItem({
         borderLeftColor: catColor,
         borderBottom: 1,
         borderBottomColor: "divider",
-        bgcolor: isActive ? "action.selected" : undefined,
+        bgcolor: isActive ? "action.selected" : rowState.bg,
       }}
     >
       <Stack
@@ -128,60 +136,78 @@ export default function SchemeListItem({
         <Typography
           variant="body2"
           noWrap
-          sx={{ flex: 1, fontWeight: isActive ? 700 : 600, py: 1 }}
+          sx={{
+            flex: 1,
+            fontWeight: isActive ? 700 : 600,
+            py: 1,
+            opacity: rowState.dim ? 0.45 : 1,
+          }}
         >
           {scheme.name}
         </Typography>
 
-        <IconButton
-          size="small"
-          aria-label={`Aim for ${scheme.name}`}
-          title={`Aim for ${scheme.name}`}
-          disabled={targetIndex === -1 && targetsFull}
-          onClick={(ev) => {
-            ev.stopPropagation();
-            onToggleAim(scheme.id);
+        <Badge
+          badgeContent={rowState.badge}
+          sx={{
+            "& .MuiBadge-badge": {
+              bgcolor: "var(--target-0)",
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: "0.62rem",
+              minWidth: 16,
+              height: 16,
+            },
           }}
-          sx={
-            targetIndex !== -1
-              ? {
-                  bgcolor: `var(--target-${targetIndex})`,
-                  color: "#fff",
-                  "&:hover": {
+        >
+          <IconButton
+            size="small"
+            aria-label={`Aim for ${scheme.name}`}
+            title={`Aim for ${scheme.name}`}
+            disabled={targetIndex === -1 && targetsFull}
+            onClick={(ev) => {
+              ev.stopPropagation();
+              onToggleAim(scheme.id);
+            }}
+            sx={
+              targetIndex !== -1
+                ? {
                     bgcolor: `var(--target-${targetIndex})`,
-                    opacity: 0.85,
-                  },
-                }
-              : undefined
-          }
-        >
-          <GpsFixedIcon fontSize="small" />
-        </IconButton>
+                    color: "#fff",
+                    "&:hover": {
+                      bgcolor: `var(--target-${targetIndex})`,
+                      opacity: 0.85,
+                    },
+                  }
+                : undefined
+            }
+          >
+            <GpsFixedIcon fontSize="small" />
+          </IconButton>
+        </Badge>
       </Stack>
-
-      {badges.length > 0 && (
-        <Stack
-          direction="row"
-          useFlexGap
-          sx={{ flexWrap: "wrap", gap: 0.5, pl: 5, pr: 1, pb: 1 }}
-        >
-          {badges.map((b) => (
-            <Chip
-              key={b.key}
-              size="small"
-              label={b.label}
-              sx={{
-                bgcolor: b.muted ? "grey.300" : (b.colorVar ?? "grey.700"),
-                color: b.muted ? "text.secondary" : "#fff",
-                fontWeight: 600,
-              }}
-            />
-          ))}
-        </Stack>
-      )}
 
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <Box sx={{ pl: 5, pr: 1.5, pb: 1.5 }}>
+          {badges.length > 0 && (
+            <Stack
+              direction="row"
+              useFlexGap
+              sx={{ flexWrap: "wrap", gap: 0.5, mb: 1 }}
+            >
+              {badges.map((b) => (
+                <Chip
+                  key={b.key}
+                  size="small"
+                  label={b.label}
+                  sx={{
+                    bgcolor: b.muted ? "grey.300" : (b.colorVar ?? "grey.700"),
+                    color: b.muted ? "text.secondary" : "#fff",
+                    fontWeight: 600,
+                  }}
+                />
+              ))}
+            </Stack>
+          )}
           <Typography
             variant="caption"
             sx={{

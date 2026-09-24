@@ -98,16 +98,6 @@ export default function App() {
             onSelect={selectNode}
             onToggleAim={toggleTarget}
           />
-
-          <Box
-            component="footer"
-            sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: "divider" }}
-          >
-            <Typography variant="caption" sx={{ color: "text.disabled" }}>
-              21 schemes · 67 next-available links · Gaining Grounds 2025
-              tournament pack
-            </Typography>
-          </Box>
         </Box>
 
         <Box component="main" sx={{ flex: 1, minWidth: 0, p: 3 }}>
