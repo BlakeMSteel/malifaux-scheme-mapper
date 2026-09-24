@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Box, Chip, Stack, TextField, Typography } from "@mui/material";
+import { Box, Chip, Stack, Typography } from "@mui/material";
 import { CAT_LABEL, SCHEMES, type Category } from "../data/schemes";
 import type { PathUnion } from "../lib/graph";
 import type { AimMode } from "../lib/badges";
-import SchemeCard from "./SchemeCard";
+import SchemeListItem from "./SchemeListItem";
 
 const CATS: Category[] = ["condition", "enemy", "turn"];
 
@@ -26,23 +26,29 @@ export default function ReferenceIndex({
   onSelect,
   onToggleAim,
 }: ReferenceIndexProps) {
-  const [query, setQuery] = useState("");
   const [activeCats, setActiveCats] = useState<Set<Category>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return SCHEMES.filter((s) => {
-      const matchesQuery = !q || s.name.toLowerCase().includes(q);
-      const matchesCat = activeCats.size === 0 || activeCats.has(s.cat);
-      return matchesQuery && matchesCat;
-    });
-  }, [query, activeCats]);
+    return SCHEMES.filter(
+      (s) => activeCats.size === 0 || activeCats.has(s.cat),
+    );
+  }, [activeCats]);
 
   function toggleCat(cat: Category) {
     setActiveCats((prev) => {
       const next = new Set(prev);
       if (next.has(cat)) next.delete(cat);
       else next.add(cat);
+      return next;
+    });
+  }
+
+  function toggleExpand(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -55,7 +61,7 @@ export default function ReferenceIndex({
           alignItems: "baseline",
           justifyContent: "space-between",
           gap: 1.5,
-          mb: 2,
+          mb: 1.5,
         }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -69,31 +75,25 @@ export default function ReferenceIndex({
       <Stack
         direction="row"
         useFlexGap
-        sx={{ flexWrap: "wrap", gap: 1.25, mb: 2.5 }}
+        sx={{ flexWrap: "wrap", gap: 1, mb: 2 }}
       >
-        <TextField
-          size="small"
-          placeholder="Search schemes by name…"
-          value={query}
-          onChange={(ev) => setQuery(ev.target.value)}
-          sx={{ flex: "1 1 240px", minWidth: 0 }}
-        />
         {CATS.map((cat) => {
           const active = activeCats.has(cat);
           return (
             <Chip
               key={cat}
+              size="small"
               clickable
               onClick={() => toggleCat(cat)}
               label={CAT_LABEL[cat]}
               icon={
                 <Box
                   sx={{
-                    width: 9,
-                    height: 9,
+                    width: 8,
+                    height: 8,
                     borderRadius: "50%",
                     bgcolor: `var(--cat-${cat})`,
-                    ml: "10px",
+                    ml: "9px",
                   }}
                 />
               }
@@ -104,31 +104,25 @@ export default function ReferenceIndex({
         })}
       </Stack>
 
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: 2,
-        }}
-      >
+      <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
         {filtered.length === 0 ? (
           <Typography
             sx={{
-              gridColumn: "1 / -1",
               textAlign: "center",
               py: 5,
               color: "text.disabled",
               fontStyle: "italic",
             }}
           >
-            No schemes match that search.
+            No schemes match that filter.
           </Typography>
         ) : (
           filtered.map((s) => (
-            <SchemeCard
+            <SchemeListItem
               key={s.id}
               scheme={s}
               isActive={s.id === selectedId}
+              expanded={expanded.has(s.id)}
               targetIndex={targets.indexOf(s.id)}
               targetsFull={targets.length >= 3}
               mode={mode}
@@ -136,6 +130,7 @@ export default function ReferenceIndex({
               distMaps={distMaps}
               pathUnion={pathUnion}
               onSelect={onSelect}
+              onToggleExpand={toggleExpand}
               onToggleAim={onToggleAim}
             />
           ))

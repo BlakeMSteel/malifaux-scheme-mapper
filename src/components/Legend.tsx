@@ -12,9 +12,6 @@ export default function Legend() {
         flexWrap: "wrap",
         columnGap: 3,
         rowGap: 1,
-        pt: 1.5,
-        borderTop: 1,
-        borderColor: "divider",
       }}
     >
       {CATS.map((cat) => (

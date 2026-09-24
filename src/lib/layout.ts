@@ -20,8 +20,27 @@ const MAX_STEPS = Math.floor(N / 2); // farthest two nodes can sit apart on the 
 const MIN_LONG_STEPS = 7;
 const MAX_SHORT_STEPS = 5;
 
+// Chord endpoints stop this many px short of the node center, so the
+// arrowhead lands just outside the dot instead of drawing into it — sized
+// to clear the largest highlighted node radius (r=10, stroke 3) plus the
+// marker's own tip overhang.
+const EDGE_INSET = 14;
+
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
+}
+
+/** Moves `point` toward `target` by `dist` px (used to trim a chord's
+ * endpoints back from the node center along its own curve direction). */
+function stepToward(
+  point: { x: number; y: number },
+  target: { x: number; y: number },
+  dist: number,
+): { x: number; y: number } {
+  const dx = target.x - point.x;
+  const dy = target.y - point.y;
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: point.x + (dx / len) * dist, y: point.y + (dy / len) * dist };
 }
 
 function toRad(deg: number) {
@@ -120,8 +139,8 @@ export function shortChordPath(a: string, b: string, steps: number): string {
   const t = clamp01((steps - 2) / (MAX_SHORT_STEPS - 2));
   const bulge = SHORT_BAND_MIN + t * (SHORT_BAND_MAX - SHORT_BAND_MIN);
   const control = pointOnCircle(angleForIndex(mid), bulge);
-  const p1 = NODE_LAYOUT[a];
-  const p2 = NODE_LAYOUT[b];
+  const p1 = stepToward(NODE_LAYOUT[a], control, EDGE_INSET);
+  const p2 = stepToward(NODE_LAYOUT[b], control, EDGE_INSET);
   return `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} Q ${control.x.toFixed(1)} ${control.y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
 }
 
@@ -137,7 +156,7 @@ export function longChordPath(a: string, b: string, steps: number): string {
   const t = clamp01((steps - MIN_LONG_STEPS) / (MAX_STEPS - MIN_LONG_STEPS));
   const depth = RING_RADIUS * (0.6 - t * 0.52);
   const control = pointOnCircle(angleForIndex(mid), depth);
-  const p1 = NODE_LAYOUT[a];
-  const p2 = NODE_LAYOUT[b];
+  const p1 = stepToward(NODE_LAYOUT[a], control, EDGE_INSET);
+  const p2 = stepToward(NODE_LAYOUT[b], control, EDGE_INSET);
   return `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} Q ${control.x.toFixed(1)} ${control.y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
 }

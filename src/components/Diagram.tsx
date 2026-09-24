@@ -1,8 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { Box, IconButton, Stack } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import RemoveIcon from "@mui/icons-material/Remove";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import { useMemo } from "react";
+import { Box } from "@mui/material";
 import { SCHEMES } from "../data/schemes";
 import { byId, EDGES, incoming, type PathUnion } from "../lib/graph";
 import {
@@ -20,8 +17,7 @@ const HOP_NODE_OPACITY = [1, 1, 0.75, 0.55];
 const HOP_EDGE_OPACITY = [0, 1, 0.7, 0.45];
 const HOP_EDGE_WIDTH = [0, 2.6, 2, 1.5];
 
-const ZOOM_LEVELS = [0.55, 0.7, 0.85, 1, 1.2, 1.4, 1.65];
-const BASE_SIZE = 800;
+const MAX_WIDTH = 800;
 
 interface DiagramProps {
   selectedId: string | null;
@@ -42,11 +38,6 @@ export default function Diagram({
   distMaps,
   pathUnion,
 }: DiagramProps) {
-  const [zoomIndex, setZoomIndex] = useState(3);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const dragState = useRef<{ x: number; y: number } | null>(null);
-  const [dragging, setDragging] = useState(false);
-
   const mode: Mode = selectedId
     ? "trace"
     : targets.length === 1
@@ -166,231 +157,158 @@ export default function Diagram({
     return cls.join(" ");
   }
 
-  function pxSize() {
-    return BASE_SIZE * ZOOM_LEVELS[zoomIndex];
-  }
-
-  function onPointerDown(ev: React.PointerEvent<HTMLDivElement>) {
+  function onBackgroundClick(ev: React.MouseEvent<HTMLDivElement>) {
     if ((ev.target as HTMLElement).closest(".node")) return;
-    if (
-      ev.target === ev.currentTarget ||
-      !(ev.target as HTMLElement).closest("svg")
-    ) {
-      onClearSelection();
-    }
-    const el = scrollRef.current;
-    if (!el) return;
-    dragState.current = { x: ev.clientX, y: ev.clientY };
-    setDragging(true);
-    el.setPointerCapture(ev.pointerId);
-  }
-
-  function onPointerMove(ev: React.PointerEvent<HTMLDivElement>) {
-    const el = scrollRef.current;
-    if (!el || !dragState.current) return;
-    const dx = ev.clientX - dragState.current.x;
-    const dy = ev.clientY - dragState.current.y;
-    dragState.current = { x: ev.clientX, y: ev.clientY };
-    el.scrollLeft -= dx;
-    el.scrollTop -= dy;
-  }
-
-  function endDrag() {
-    dragState.current = null;
-    setDragging(false);
+    onClearSelection();
   }
 
   return (
-    <>
-      <Stack
-        direction="row"
-        spacing={0.75}
-        sx={{ position: "absolute", top: 12, right: 14, zIndex: 3 }}
+    <Box
+      onClick={onBackgroundClick}
+      sx={{
+        display: "flex",
+        justifyContent: "center",
+        pt: 1.25,
+        pb: 2.5,
+      }}
+    >
+      <svg
+        className={"wheel-svg" + (mode === "trace" ? " has-selection" : "")}
+        style={{ width: "100%", maxWidth: MAX_WIDTH, height: "auto" }}
+        viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
+        role="img"
+        aria-label="Circular map of all 21 schemes: the outer ring is the discovered Hamiltonian cycle, and inner/outer curves are every other next-available link."
       >
-        <IconButton
-          size="small"
-          aria-label="Zoom out"
-          onClick={() => setZoomIndex((i) => Math.max(0, i - 1))}
-          sx={{ border: 1, borderColor: "divider", borderRadius: 1.5 }}
-        >
-          <RemoveIcon fontSize="small" />
-        </IconButton>
-        <IconButton
-          size="small"
-          aria-label="Reset zoom"
-          onClick={() => setZoomIndex(3)}
-          sx={{ border: 1, borderColor: "divider", borderRadius: 1.5 }}
-        >
-          <RestartAltIcon fontSize="small" />
-        </IconButton>
-        <IconButton
-          size="small"
-          aria-label="Zoom in"
-          onClick={() =>
-            setZoomIndex((i) => Math.min(ZOOM_LEVELS.length - 1, i + 1))
-          }
-          sx={{ border: 1, borderColor: "divider", borderRadius: 1.5 }}
-        >
-          <AddIcon fontSize="small" />
-        </IconButton>
-      </Stack>
+        <defs>
+          {(["ring", "condition", "enemy", "turn"] as const).map((k) => (
+            <marker
+              key={k}
+              id={`arrow-${k}`}
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth={k === "ring" ? 7 : 6}
+              markerHeight={k === "ring" ? 7 : 6}
+              orient="auto-start-reverse"
+            >
+              <path
+                d="M0,0 L10,5 L0,10 z"
+                fill={k === "ring" ? "var(--ink-muted)" : `var(--cat-${k})`}
+                opacity={k === "ring" ? 0.8 : 0.55}
+              />
+            </marker>
+          ))}
+        </defs>
 
-      <Box
-        ref={scrollRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerLeave={endDrag}
-        sx={{
-          overflow: "auto",
-          maxHeight: "78vh",
-          display: "flex",
-          justifyContent: "center",
-          px: 0.5,
-          pt: 1.25,
-          pb: 2.5,
-          cursor: dragging ? "grabbing" : "grab",
-        }}
-      >
-        <svg
-          className={"wheel-svg" + (mode === "trace" ? " has-selection" : "")}
-          width={pxSize()}
-          height={pxSize()}
-          viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
-          role="img"
-          aria-label="Circular map of all 21 schemes: the outer ring is the discovered Hamiltonian cycle, and inner/outer curves are every other next-available link."
-        >
-          <defs>
-            {(["ring", "condition", "enemy", "turn"] as const).map((k) => (
-              <marker
-                key={k}
-                id={`arrow-${k}`}
-                viewBox="0 0 10 10"
-                refX="8"
-                refY="5"
-                markerWidth={k === "ring" ? 7 : 6}
-                markerHeight={k === "ring" ? 7 : 6}
-                orient="auto-start-reverse"
+        <g className="chords">
+          {EDGES.filter((e) => e.kind !== "ring").map((e) => {
+            const key = e.source + ">" + e.target;
+            const cat = byId[e.source].cat;
+            const d =
+              e.kind === "short"
+                ? shortChordPath(e.source, e.target, e.steps)
+                : longChordPath(e.source, e.target, e.steps);
+            const v = edgeVisual[key];
+            const connectedDim =
+              connected &&
+              !(connected.has(e.source) && connected.has(e.target));
+            return (
+              <path
+                key={key}
+                className={edgeClass(e.kind, e.source, e.target)}
+                data-cat={cat}
+                d={d}
+                markerEnd={`url(#arrow-${cat})`}
+                style={{
+                  stroke: v?.stroke,
+                  opacity: v?.opacity,
+                  strokeWidth: v?.strokeWidth,
+                  ...(connectedDim ? { opacity: 0.06 } : {}),
+                }}
+              />
+            );
+          })}
+        </g>
+        <g className="ring">
+          {EDGES.filter((e) => e.kind === "ring").map((e) => {
+            const key = e.source + ">" + e.target;
+            const v = edgeVisual[key];
+            const connectedDim =
+              connected &&
+              !(connected.has(e.source) && connected.has(e.target));
+            return (
+              <path
+                key={key}
+                className={edgeClass(e.kind, e.source, e.target)}
+                d={ringPath(e.source, e.target)}
+                markerEnd="url(#arrow-ring)"
+                style={{
+                  stroke: v?.stroke,
+                  opacity: v?.opacity,
+                  strokeWidth: v?.strokeWidth,
+                  ...(connectedDim ? { opacity: 0.15 } : {}),
+                }}
+              />
+            );
+          })}
+        </g>
+        <g className="nodes">
+          {SCHEMES.map((s) => {
+            const layout = NODE_LAYOUT[s.id];
+            const nv = nodeVisual[s.id];
+            const dimByTrace = connected && !connected.has(s.id);
+            return (
+              <g
+                key={s.id}
+                className={"node" + (s.id === selectedId ? " active" : "")}
+                data-cat={s.cat}
+                tabIndex={0}
+                role="button"
+                aria-label={s.name}
+                onClick={() => onSelectNode(s.id)}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Enter" || ev.key === " ") {
+                    ev.preventDefault();
+                    onSelectNode(s.id);
+                  }
+                }}
+                style={{ opacity: dimByTrace ? 0.35 : undefined }}
               >
-                <path
-                  d="M0,0 L10,5 L0,10 z"
-                  fill={k === "ring" ? "var(--ink-muted)" : `var(--cat-${k})`}
-                  opacity={k === "ring" ? 0.8 : 0.55}
-                />
-              </marker>
-            ))}
-          </defs>
-
-          <g className="chords">
-            {EDGES.filter((e) => e.kind !== "ring").map((e) => {
-              const key = e.source + ">" + e.target;
-              const cat = byId[e.source].cat;
-              const d =
-                e.kind === "short"
-                  ? shortChordPath(e.source, e.target, e.steps)
-                  : longChordPath(e.source, e.target, e.steps);
-              const v = edgeVisual[key];
-              const connectedDim =
-                connected &&
-                !(connected.has(e.source) && connected.has(e.target));
-              return (
-                <path
-                  key={key}
-                  className={edgeClass(e.kind, e.source, e.target)}
-                  data-cat={cat}
-                  d={d}
-                  markerEnd={`url(#arrow-${cat})`}
+                <circle
+                  className="node-dot"
+                  cx={layout.x}
+                  cy={layout.y}
+                  r={nv?.r ?? 7}
                   style={{
-                    stroke: v?.stroke,
-                    opacity: v?.opacity,
-                    strokeWidth: v?.strokeWidth,
-                    ...(connectedDim ? { opacity: 0.06 } : {}),
+                    fill: nv?.fill,
+                    opacity: nv?.opacity,
+                    stroke: nv?.stroke,
+                    strokeWidth: nv?.strokeWidth,
                   }}
                 />
-              );
-            })}
-          </g>
-          <g className="ring">
-            {EDGES.filter((e) => e.kind === "ring").map((e) => {
-              const key = e.source + ">" + e.target;
-              const v = edgeVisual[key];
-              const connectedDim =
-                connected &&
-                !(connected.has(e.source) && connected.has(e.target));
-              return (
-                <path
-                  key={key}
-                  className={edgeClass(e.kind, e.source, e.target)}
-                  d={ringPath(e.source, e.target)}
-                  markerEnd="url(#arrow-ring)"
-                  style={{
-                    stroke: v?.stroke,
-                    opacity: v?.opacity,
-                    strokeWidth: v?.strokeWidth,
-                    ...(connectedDim ? { opacity: 0.15 } : {}),
-                  }}
-                />
-              );
-            })}
-          </g>
-          <g className="nodes">
-            {SCHEMES.map((s) => {
-              const layout = NODE_LAYOUT[s.id];
-              const nv = nodeVisual[s.id];
-              const dimByTrace = connected && !connected.has(s.id);
-              return (
-                <g
-                  key={s.id}
-                  className={"node" + (s.id === selectedId ? " active" : "")}
-                  data-cat={s.cat}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={s.name}
-                  onClick={() => onSelectNode(s.id)}
-                  onKeyDown={(ev) => {
-                    if (ev.key === "Enter" || ev.key === " ") {
-                      ev.preventDefault();
-                      onSelectNode(s.id);
-                    }
-                  }}
-                  style={{ opacity: dimByTrace ? 0.35 : undefined }}
+                <text
+                  className="node-label"
+                  x={layout.labelX}
+                  y={layout.labelY}
+                  textAnchor={layout.labelAnchor}
+                  transform={`rotate(${layout.labelRotation.toFixed(1)} ${layout.labelX.toFixed(1)} ${layout.labelY.toFixed(1)})`}
+                  style={{ opacity: nv?.opacity, fill: nv?.fill }}
                 >
-                  <circle
-                    className="node-dot"
-                    cx={layout.x}
-                    cy={layout.y}
-                    r={nv?.r ?? 7}
-                    style={{
-                      fill: nv?.fill,
-                      opacity: nv?.opacity,
-                      stroke: nv?.stroke,
-                      strokeWidth: nv?.strokeWidth,
-                    }}
-                  />
-                  <text
-                    className="node-label"
-                    x={layout.labelX}
-                    y={layout.labelY}
-                    textAnchor={layout.labelAnchor}
-                    transform={`rotate(${layout.labelRotation.toFixed(1)} ${layout.labelX.toFixed(1)} ${layout.labelY.toFixed(1)})`}
-                    style={{ opacity: nv?.opacity, fill: nv?.fill }}
-                  >
-                    {s.name}
-                  </text>
-                </g>
-              );
-            })}
-            <circle
-              cx={CENTER}
-              cy={CENTER}
-              r={RING_RADIUS}
-              fill="none"
-              stroke="none"
-              pointerEvents="none"
-            />
-          </g>
-        </svg>
-      </Box>
-    </>
+                  {s.name}
+                </text>
+              </g>
+            );
+          })}
+          <circle
+            cx={CENTER}
+            cy={CENTER}
+            r={RING_RADIUS}
+            fill="none"
+            stroke="none"
+            pointerEvents="none"
+          />
+        </g>
+      </svg>
+    </Box>
   );
 }
