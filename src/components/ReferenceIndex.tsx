@@ -65,7 +65,7 @@ export default function ReferenceIndex({
         }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          Reference Index
+          Schemes
         </Typography>
         <Typography variant="caption" sx={{ color: "text.disabled" }}>
           {filtered.length} {filtered.length === 1 ? "scheme" : "schemes"}
