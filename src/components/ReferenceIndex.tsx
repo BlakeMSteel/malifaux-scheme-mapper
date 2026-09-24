@@ -10,21 +10,25 @@ const CATS: Category[] = ["condition", "enemy", "turn"];
 interface ReferenceIndexProps {
   selectedId: string | null;
   targets: string[];
+  sources: string[];
   mode: AimMode;
   distMaps: (Record<string, number> | null)[];
   pathUnion: PathUnion | null;
   onSelect: (id: string) => void;
   onToggleAim: (id: string) => void;
+  onToggleSource: (id: string) => void;
 }
 
 export default function ReferenceIndex({
   selectedId,
   targets,
+  sources,
   mode,
   distMaps,
   pathUnion,
   onSelect,
   onToggleAim,
+  onToggleSource,
 }: ReferenceIndexProps) {
   const [activeCats, setActiveCats] = useState<Set<Category>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -125,13 +129,17 @@ export default function ReferenceIndex({
               expanded={expanded.has(s.id)}
               targetIndex={targets.indexOf(s.id)}
               targetsFull={targets.length >= 3}
+              sourceIndex={sources.indexOf(s.id)}
+              sourcesFull={sources.length >= 3}
               mode={mode}
               targets={targets}
+              sources={sources}
               distMaps={distMaps}
               pathUnion={pathUnion}
               onSelect={onSelect}
               onToggleExpand={toggleExpand}
               onToggleAim={onToggleAim}
+              onToggleSource={onToggleSource}
             />
           ))
         )}

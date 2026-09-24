@@ -3,7 +3,11 @@ import { AppBar, Box, Toolbar, Typography } from "@mui/material";
 import Legend from "./components/Legend";
 import Diagram from "./components/Diagram";
 import ReferenceIndex from "./components/ReferenceIndex";
-import { computeDistMap, computePathUnion } from "./lib/graph";
+import {
+  computeDistMap,
+  computeDistMapForward,
+  computePathUnion,
+} from "./lib/graph";
 import type { AimMode } from "./lib/badges";
 
 const TOOLBAR_HEIGHT = 48;
@@ -11,27 +15,33 @@ const TOOLBAR_HEIGHT = 48;
 export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [targets, setTargets] = useState<string[]>([]);
+  const [sources, setSources] = useState<string[]>([]);
 
   const mode: AimMode = selectedId
     ? "trace"
     : targets.length === 1
-      ? "gradient"
+      ? "toGradient"
       : targets.length >= 2
-        ? "intersect"
-        : "none";
+        ? "toIntersect"
+        : sources.length >= 1
+          ? "fromGradient"
+          : "none";
 
   const distMaps = useMemo(() => {
-    if (targets.length !== 1) return [];
-    return [computeDistMap(targets[0])];
-  }, [targets]);
+    if (targets.length === 1) return [computeDistMap(targets[0])];
+    if (sources.length >= 1)
+      return sources.map((s) => computeDistMapForward(s));
+    return [];
+  }, [targets, sources]);
 
   const pathUnion = useMemo(() => {
-    if (targets.length < 2) return null;
-    return computePathUnion(targets);
+    if (targets.length >= 2) return computePathUnion(targets);
+    return null;
   }, [targets]);
 
   function selectNode(id: string) {
     setTargets([]);
+    setSources([]);
     setSelectedId((prev) => (prev === id ? null : id));
   }
 
@@ -41,7 +51,18 @@ export default function App() {
 
   function toggleTarget(id: string) {
     setSelectedId(null);
+    setSources([]);
     setTargets((prev) => {
+      if (prev.includes(id)) return prev.filter((t) => t !== id);
+      if (prev.length >= 3) return prev;
+      return [...prev, id];
+    });
+  }
+
+  function toggleSource(id: string) {
+    setSelectedId(null);
+    setTargets([]);
+    setSources((prev) => {
       if (prev.includes(id)) return prev.filter((t) => t !== id);
       if (prev.length >= 3) return prev;
       return [...prev, id];
@@ -53,6 +74,7 @@ export default function App() {
       if (ev.key === "Escape") {
         setSelectedId(null);
         setTargets([]);
+        setSources([]);
       }
     }
     document.addEventListener("keydown", onKeyDown);
@@ -92,11 +114,13 @@ export default function App() {
           <ReferenceIndex
             selectedId={selectedId}
             targets={targets}
+            sources={sources}
             mode={mode}
             distMaps={distMaps}
             pathUnion={pathUnion}
             onSelect={selectNode}
             onToggleAim={toggleTarget}
+            onToggleSource={toggleSource}
           />
         </Box>
 
@@ -115,6 +139,7 @@ export default function App() {
               onSelectNode={selectNode}
               onClearSelection={clearSelection}
               targets={targets}
+              sources={sources}
               distMaps={distMaps}
               pathUnion={pathUnion}
             />

@@ -9,9 +9,23 @@ import {
 } from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import GpsFixedIcon from "@mui/icons-material/GpsFixed";
+import CallSplitIcon from "@mui/icons-material/CallSplit";
 import { CAT_LABEL, type Scheme } from "../data/schemes";
 import { byId, incoming, type PathUnion } from "../lib/graph";
 import { hopBadges, schemeRowState, type AimMode } from "../lib/badges";
+
+function badgeSx(color: string | undefined) {
+  return {
+    "& .MuiBadge-badge": {
+      bgcolor: color ?? "var(--target-0)",
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: "0.62rem",
+      minWidth: 16,
+      height: 16,
+    },
+  };
+}
 
 interface SchemeListItemProps {
   scheme: Scheme;
@@ -19,13 +33,17 @@ interface SchemeListItemProps {
   expanded: boolean;
   targetIndex: number;
   targetsFull: boolean;
+  sourceIndex: number;
+  sourcesFull: boolean;
   mode: AimMode;
   targets: string[];
+  sources: string[];
   distMaps: (Record<string, number> | null)[];
   pathUnion: PathUnion | null;
   onSelect: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onToggleAim: (id: string) => void;
+  onToggleSource: (id: string) => void;
 }
 
 function ChipRow({ label, ids }: { label: string; ids: string[] }) {
@@ -64,22 +82,34 @@ export default function SchemeListItem({
   expanded,
   targetIndex,
   targetsFull,
+  sourceIndex,
+  sourcesFull,
   mode,
   targets,
+  sources,
   distMaps,
   pathUnion,
   onSelect,
   onToggleExpand,
   onToggleAim,
+  onToggleSource,
 }: SchemeListItemProps) {
   const rowState = schemeRowState(
     scheme.id,
     mode,
     targets,
+    sources,
     distMaps,
     pathUnion,
   );
-  const badges = hopBadges(scheme.id, mode, targets, distMaps, pathUnion);
+  const badges = hopBadges(
+    scheme.id,
+    mode,
+    targets,
+    sources,
+    distMaps,
+    pathUnion,
+  );
   const catColor = `var(--cat-${scheme.cat})`;
 
   return (
@@ -146,44 +176,67 @@ export default function SchemeListItem({
           {scheme.name}
         </Typography>
 
-        <Badge
-          badgeContent={rowState.badge}
-          sx={{
-            "& .MuiBadge-badge": {
-              bgcolor: "var(--target-0)",
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: "0.62rem",
-              minWidth: 16,
-              height: 16,
-            },
-          }}
-        >
-          <IconButton
-            size="small"
-            aria-label={`Aim for ${scheme.name}`}
-            title={`Aim for ${scheme.name}`}
-            disabled={targetIndex === -1 && targetsFull}
-            onClick={(ev) => {
-              ev.stopPropagation();
-              onToggleAim(scheme.id);
-            }}
-            sx={
-              targetIndex !== -1
-                ? {
-                    bgcolor: `var(--target-${targetIndex})`,
-                    color: "#fff",
-                    "&:hover": {
-                      bgcolor: `var(--target-${targetIndex})`,
-                      opacity: 0.85,
-                    },
-                  }
-                : undefined
-            }
+        <Stack direction="row" spacing={0.25}>
+          <Badge
+            badgeContent={mode === "fromGradient" ? rowState.badge : undefined}
+            sx={badgeSx(rowState.badgeColor)}
           >
-            <GpsFixedIcon fontSize="small" />
-          </IconButton>
-        </Badge>
+            <IconButton
+              size="small"
+              aria-label={`Use ${scheme.name} as a source`}
+              title={`Use ${scheme.name} as a source`}
+              disabled={sourceIndex === -1 && sourcesFull}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                onToggleSource(scheme.id);
+              }}
+              sx={
+                sourceIndex !== -1
+                  ? {
+                      bgcolor: `var(--target-${sourceIndex})`,
+                      color: "#fff",
+                      "&:hover": {
+                        bgcolor: `var(--target-${sourceIndex})`,
+                        opacity: 0.85,
+                      },
+                    }
+                  : undefined
+              }
+            >
+              <CallSplitIcon fontSize="small" />
+            </IconButton>
+          </Badge>
+
+          <Badge
+            badgeContent={mode === "toGradient" ? rowState.badge : undefined}
+            sx={badgeSx(rowState.badgeColor)}
+          >
+            <IconButton
+              size="small"
+              aria-label={`Aim for ${scheme.name}`}
+              title={`Aim for ${scheme.name}`}
+              disabled={targetIndex === -1 && targetsFull}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                onToggleAim(scheme.id);
+              }}
+              sx={
+                targetIndex !== -1
+                  ? {
+                      bgcolor: `var(--target-${targetIndex})`,
+                      color: "#fff",
+                      "&:hover": {
+                        bgcolor: `var(--target-${targetIndex})`,
+                        opacity: 0.85,
+                      },
+                    }
+                  : undefined
+              }
+            >
+              <GpsFixedIcon fontSize="small" />
+            </IconButton>
+          </Badge>
+        </Stack>
       </Stack>
 
       <Collapse in={expanded} timeout="auto" unmountOnExit>

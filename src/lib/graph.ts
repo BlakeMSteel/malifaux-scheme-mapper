@@ -75,7 +75,8 @@ export const ALL_CHAINS: string[][] = (() => {
   return out;
 })();
 
-/** BFS backward along "next" links, capped at 3 hops, from a single target. */
+/** BFS backward along "next" links, capped at 3 hops, from a single target:
+ * dist[x] = hops needed to REACH the target starting from x. */
 export function computeDistMap(targetId: string): Record<string, number> {
   const dist: Record<string, number> = { [targetId]: 0 };
   const queue: string[] = [targetId];
@@ -86,6 +87,27 @@ export function computeDistMap(targetId: string): Record<string, number> {
       if (dist[p] === undefined) {
         dist[p] = dist[cur] + 1;
         queue.push(p);
+      }
+    });
+  }
+  return dist;
+}
+
+/** BFS forward along "next" links, capped at 3 hops, from a single source:
+ * dist[x] = hops needed to REACH x starting from the source. Mirror of
+ * computeDistMap for the "Aim From" direction. */
+export function computeDistMapForward(
+  sourceId: string,
+): Record<string, number> {
+  const dist: Record<string, number> = { [sourceId]: 0 };
+  const queue: string[] = [sourceId];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    if (dist[cur] >= 3) continue;
+    byId[cur].next.forEach((n) => {
+      if (dist[n] === undefined) {
+        dist[n] = dist[cur] + 1;
+        queue.push(n);
       }
     });
   }

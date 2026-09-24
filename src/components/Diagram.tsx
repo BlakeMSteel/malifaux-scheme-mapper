@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Box } from "@mui/material";
 import { SCHEMES } from "../data/schemes";
 import { byId, EDGES, incoming, type PathUnion } from "../lib/graph";
+import { bestSourceMatch, type AimMode } from "../lib/badges";
 import {
   CENTER,
   NODE_LAYOUT,
@@ -24,27 +25,29 @@ interface DiagramProps {
   onSelectNode: (id: string) => void;
   onClearSelection: () => void;
   targets: string[];
+  sources: string[];
   distMaps: (Record<string, number> | null)[];
   pathUnion: PathUnion | null;
 }
-
-type Mode = "none" | "trace" | "gradient" | "intersect";
 
 export default function Diagram({
   selectedId,
   onSelectNode,
   onClearSelection,
   targets,
+  sources,
   distMaps,
   pathUnion,
 }: DiagramProps) {
-  const mode: Mode = selectedId
+  const mode: AimMode = selectedId
     ? "trace"
     : targets.length === 1
-      ? "gradient"
+      ? "toGradient"
       : targets.length >= 2
-        ? "intersect"
-        : "none";
+        ? "toIntersect"
+        : sources.length >= 1
+          ? "fromGradient"
+          : "none";
 
   const nodeVisual = useMemo(() => {
     const out: Record<
@@ -58,7 +61,7 @@ export default function Diagram({
       }
     > = {};
 
-    if (mode === "gradient") {
+    if (mode === "toGradient") {
       const dm = distMaps[0];
       SCHEMES.forEach((s) => {
         const d = dm?.[s.id];
@@ -74,7 +77,24 @@ export default function Diagram({
           };
         }
       });
-    } else if (mode === "intersect") {
+    } else if (mode === "fromGradient") {
+      // Origins are independent, not a shared path — each node takes the
+      // color/distance of whichever selected source reaches it fastest.
+      SCHEMES.forEach((s) => {
+        const best = bestSourceMatch(s.id, sources.length, distMaps);
+        if (!best) {
+          out[s.id] = { opacity: 0.16, r: 6 };
+        } else {
+          out[s.id] = {
+            fill: `var(--target-${best.ti})`,
+            opacity: HOP_NODE_OPACITY[best.dist],
+            r: HOP_NODE_R[best.dist],
+            stroke: best.dist === 0 ? "var(--ink)" : undefined,
+            strokeWidth: best.dist === 0 ? 3 : undefined,
+          };
+        }
+      });
+    } else if (mode === "toIntersect") {
       SCHEMES.forEach((s) => {
         const ti = targets.indexOf(s.id);
         if (ti !== -1) {
@@ -93,7 +113,7 @@ export default function Diagram({
       });
     }
     return out;
-  }, [mode, distMaps, targets, pathUnion]);
+  }, [mode, distMaps, targets, sources, pathUnion]);
 
   const edgeVisual = useMemo(() => {
     const out: Record<
@@ -101,12 +121,14 @@ export default function Diagram({
       { stroke?: string; opacity?: number; strokeWidth?: number }
     > = {};
 
-    if (mode === "gradient") {
+    if (mode === "toGradient") {
       const dm = distMaps[0];
       EDGES.forEach((e) => {
         const key = e.source + ">" + e.target;
         const du = dm?.[e.source];
         const dv = dm?.[e.target];
+        // dist = hops-to-target, so u->v is "on the way" when v is one hop
+        // closer to the target than u.
         if (dv !== undefined && du === dv + 1) {
           out[key] = {
             stroke: "var(--target-0)",
@@ -117,7 +139,31 @@ export default function Diagram({
           out[key] = { opacity: 0.04 };
         }
       });
-    } else if (mode === "intersect") {
+    } else if (mode === "fromGradient") {
+      EDGES.forEach((e) => {
+        const key = e.source + ">" + e.target;
+        let best: { ti: number; level: number } | null = null;
+        for (let ti = 0; ti < sources.length; ti++) {
+          const dm = distMaps[ti];
+          const du = dm?.[e.source];
+          const dv = dm?.[e.target];
+          // dist = hops-from-source, so u->v is "on the way" when v is one
+          // hop farther from that source than u.
+          if (du !== undefined && dv === du + 1) {
+            if (best === null || du < best.level) best = { ti, level: dv };
+          }
+        }
+        if (best) {
+          out[key] = {
+            stroke: `var(--target-${best.ti})`,
+            opacity: HOP_EDGE_OPACITY[best.level],
+            strokeWidth: HOP_EDGE_WIDTH[best.level],
+          };
+        } else {
+          out[key] = { opacity: 0.04 };
+        }
+      });
+    } else if (mode === "toIntersect") {
       EDGES.forEach((e) => {
         const key = e.source + ">" + e.target;
         if (pathUnion?.edgeSet.has(key)) {
@@ -128,7 +174,7 @@ export default function Diagram({
       });
     }
     return out;
-  }, [mode, distMaps, pathUnion]);
+  }, [mode, distMaps, sources, pathUnion]);
 
   const connected = useMemo(() => {
     if (mode !== "trace" || !selectedId) return null;
