@@ -1,23 +1,16 @@
+import {
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
+import GpsFixedIcon from "@mui/icons-material/GpsFixed";
 import { CAT_LABEL, type Scheme } from "../data/schemes";
 import { byId, incoming, type PathUnion } from "../lib/graph";
 import { hopBadges, type AimMode } from "../lib/badges";
-
-const AIM_ICON = (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    strokeLinecap="round"
-  >
-    <circle cx="12" cy="12" r="6.5" />
-    <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
-    <line x1="12" y1="1.5" x2="12" y2="4.5" />
-    <line x1="12" y1="19.5" x2="12" y2="22.5" />
-    <line x1="1.5" y1="12" x2="4.5" y2="12" />
-    <line x1="19.5" y1="12" x2="22.5" y2="12" />
-  </svg>
-);
 
 interface SchemeCardProps {
   scheme: Scheme;
@@ -32,19 +25,33 @@ interface SchemeCardProps {
   onToggleAim: (id: string) => void;
 }
 
-function chipRow(label: string, ids: string[]) {
+function ChipRow({ label, ids }: { label: string; ids: string[] }) {
   if (!ids.length) return null;
   return (
-    <>
-      <div className="chip-label">{label}</div>
-      <div className="chip-row">
+    <Box sx={{ mt: 1 }}>
+      <Typography
+        variant="caption"
+        sx={{
+          color: "text.disabled",
+          textTransform: "uppercase",
+          letterSpacing: 0.4,
+          display: "block",
+          mb: 0.5,
+        }}
+      >
+        {label}
+      </Typography>
+      <Stack direction="row" useFlexGap sx={{ flexWrap: "wrap", gap: 0.5 }}>
         {ids.map((id) => (
-          <span className="chip" key={id}>
-            {byId[id].name}
-          </span>
+          <Chip
+            key={id}
+            size="small"
+            variant="outlined"
+            label={byId[id].name}
+          />
         ))}
-      </div>
-    </>
+      </Stack>
+    </Box>
   );
 }
 
@@ -61,63 +68,126 @@ export default function SchemeCard({
   onToggleAim,
 }: SchemeCardProps) {
   const badges = hopBadges(scheme.id, mode, targets, distMaps, pathUnion);
-  const aimStyle =
-    targetIndex !== -1
-      ? {
-          background: `var(--target-${targetIndex})`,
-          borderColor: "transparent",
-        }
-      : undefined;
+  const catColor = `var(--cat-${scheme.cat})`;
 
   return (
-    <article
-      className={"card" + (isActive ? " active" : "")}
-      data-cat={scheme.cat}
-      onClick={() => onSelect(scheme.id)}
+    <Card
+      variant="outlined"
+      sx={{
+        borderLeft: 4,
+        borderLeftColor: catColor,
+        ...(isActive && {
+          boxShadow: (t) => `0 0 0 2px ${t.palette.text.primary}`,
+        }),
+      }}
     >
-      <div className="card-top">
-        <div className="card-name-group">
-          <span className="card-name">{scheme.name}</span>
-          <span className="card-badge">{CAT_LABEL[scheme.cat]}</span>
-        </div>
-        <button
-          className="aim-toggle"
-          type="button"
-          aria-pressed={targetIndex !== -1}
-          aria-label={`Aim for ${scheme.name}`}
-          title={`Aim for ${scheme.name}`}
-          style={aimStyle}
-          disabled={targetIndex === -1 && targetsFull}
-          onClick={(ev) => {
-            ev.stopPropagation();
-            onToggleAim(scheme.id);
+      <CardContent
+        role="button"
+        tabIndex={0}
+        onClick={() => onSelect(scheme.id)}
+        onKeyDown={(ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            onSelect(scheme.id);
+          }
+        }}
+        sx={{
+          cursor: "pointer",
+          "&:hover": { bgcolor: "action.hover" },
+          "&:focus-visible": {
+            outline: "2px solid",
+            outlineColor: "primary.main",
+            outlineOffset: -2,
+          },
+        }}
+      >
+        <Stack
+          direction="row"
+          sx={{
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 1,
           }}
         >
-          {AIM_ICON}
-        </button>
-      </div>
-
-      {badges.length > 0 && (
-        <div className="hop-badges">
-          {badges.map((b) => (
-            <span
-              key={b.key}
-              className={"hop-badge" + (b.muted ? " muted" : "")}
-              style={b.colorVar ? { background: b.colorVar } : undefined}
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              {scheme.name}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "text.disabled",
+                textTransform: "uppercase",
+                letterSpacing: 0.4,
+              }}
             >
-              {b.label}
-            </span>
-          ))}
-        </div>
-      )}
+              {CAT_LABEL[scheme.cat]}
+            </Typography>
+          </Box>
+          <IconButton
+            size="small"
+            aria-label={`Aim for ${scheme.name}`}
+            title={`Aim for ${scheme.name}`}
+            disabled={targetIndex === -1 && targetsFull}
+            onClick={(ev) => {
+              ev.stopPropagation();
+              onToggleAim(scheme.id);
+            }}
+            sx={
+              targetIndex !== -1
+                ? {
+                    bgcolor: `var(--target-${targetIndex})`,
+                    color: "#fff",
+                    "&:hover": {
+                      bgcolor: `var(--target-${targetIndex})`,
+                      opacity: 0.85,
+                    },
+                  }
+                : undefined
+            }
+          >
+            <GpsFixedIcon fontSize="small" />
+          </IconButton>
+        </Stack>
 
-      <div className="card-reveal">{scheme.reveal}</div>
-      <div className="card-scoring">
-        <b>Score</b> {scheme.scoring} <b>Bonus</b> {scheme.bonus}
-      </div>
+        {badges.length > 0 && (
+          <Stack
+            direction="row"
+            useFlexGap
+            sx={{ flexWrap: "wrap", gap: 0.5, mt: 1 }}
+          >
+            {badges.map((b) => (
+              <Chip
+                key={b.key}
+                size="small"
+                label={b.label}
+                sx={{
+                  bgcolor: b.muted ? "grey.300" : (b.colorVar ?? "grey.700"),
+                  color: b.muted ? "text.secondary" : "#fff",
+                  fontWeight: 600,
+                }}
+              />
+            ))}
+          </Stack>
+        )}
 
-      {chipRow("Next available", scheme.next)}
-      {chipRow("Leads here from", incoming[scheme.id])}
-    </article>
+        <Typography variant="body2" sx={{ color: "text.secondary", mt: 1.25 }}>
+          {scheme.reveal}
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          <Box component="strong" sx={{ color: "text.secondary" }}>
+            Score
+          </Box>{" "}
+          {scheme.scoring}{" "}
+          <Box component="strong" sx={{ color: "text.secondary" }}>
+            Bonus
+          </Box>{" "}
+          {scheme.bonus}
+        </Typography>
+
+        <ChipRow label="Next available" ids={scheme.next} />
+        <ChipRow label="Leads here from" ids={incoming[scheme.id]} />
+      </CardContent>
+    </Card>
   );
 }

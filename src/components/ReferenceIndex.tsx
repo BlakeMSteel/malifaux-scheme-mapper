@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Box, Chip, Stack, TextField, Typography } from "@mui/material";
 import { CAT_LABEL, SCHEMES, type Category } from "../data/schemes";
 import type { PathUnion } from "../lib/graph";
 import type { AimMode } from "../lib/badges";
@@ -47,42 +48,81 @@ export default function ReferenceIndex({
   }
 
   return (
-    <section aria-label="Scheme reference index">
-      <div className="index-head">
-        <h2>Reference Index</h2>
-        <span className="index-count">
+    <Box component="section" aria-label="Scheme reference index">
+      <Stack
+        direction="row"
+        sx={{
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 1.5,
+          mb: 2,
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          Reference Index
+        </Typography>
+        <Typography variant="caption" sx={{ color: "text.disabled" }}>
           {filtered.length} {filtered.length === 1 ? "scheme" : "schemes"}
-        </span>
-      </div>
+        </Typography>
+      </Stack>
 
-      <div className="search-row">
-        <input
-          id="search"
-          type="text"
+      <Stack
+        direction="row"
+        useFlexGap
+        sx={{ flexWrap: "wrap", gap: 1.25, mb: 2.5 }}
+      >
+        <TextField
+          size="small"
           placeholder="Search schemes by name…"
           value={query}
           onChange={(ev) => setQuery(ev.target.value)}
+          sx={{ flex: "1 1 240px", minWidth: 0 }}
         />
-        {CATS.map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            className="filter-chip"
-            aria-pressed={activeCats.has(cat)}
-            onClick={() => toggleCat(cat)}
-          >
-            <span
-              className="filter-chip-dot"
-              style={{ background: `var(--cat-${cat})` }}
+        {CATS.map((cat) => {
+          const active = activeCats.has(cat);
+          return (
+            <Chip
+              key={cat}
+              clickable
+              onClick={() => toggleCat(cat)}
+              label={CAT_LABEL[cat]}
+              icon={
+                <Box
+                  sx={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: "50%",
+                    bgcolor: `var(--cat-${cat})`,
+                    ml: "10px",
+                  }}
+                />
+              }
+              variant={active ? "filled" : "outlined"}
+              sx={active ? { bgcolor: "grey.800", color: "#fff" } : undefined}
             />
-            {CAT_LABEL[cat]}
-          </button>
-        ))}
-      </div>
+          );
+        })}
+      </Stack>
 
-      <div className="cards">
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 2,
+        }}
+      >
         {filtered.length === 0 ? (
-          <div className="empty-state">No schemes match that search.</div>
+          <Typography
+            sx={{
+              gridColumn: "1 / -1",
+              textAlign: "center",
+              py: 5,
+              color: "text.disabled",
+              fontStyle: "italic",
+            }}
+          >
+            No schemes match that search.
+          </Typography>
         ) : (
           filtered.map((s) => (
             <SchemeCard
@@ -100,7 +140,7 @@ export default function ReferenceIndex({
             />
           ))
         )}
-      </div>
-    </section>
+      </Box>
+    </Box>
   );
 }

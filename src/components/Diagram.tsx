@@ -1,4 +1,8 @@
 import { useMemo, useRef, useState } from "react";
+import { Box, IconButton, Stack } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import { SCHEMES } from "../data/schemes";
 import { byId, EDGES, incoming, type PathUnion } from "../lib/graph";
 import {
@@ -198,42 +202,55 @@ export default function Diagram({
 
   return (
     <>
-      <div className="zoom-controls">
-        <button
-          className="zoom-btn"
-          type="button"
+      <Stack
+        direction="row"
+        spacing={0.75}
+        sx={{ position: "absolute", top: 12, right: 14, zIndex: 3 }}
+      >
+        <IconButton
+          size="small"
           aria-label="Zoom out"
           onClick={() => setZoomIndex((i) => Math.max(0, i - 1))}
+          sx={{ border: 1, borderColor: "divider", borderRadius: 1.5 }}
         >
-          &minus;
-        </button>
-        <button
-          className="zoom-btn"
-          type="button"
+          <RemoveIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
           aria-label="Reset zoom"
           onClick={() => setZoomIndex(3)}
+          sx={{ border: 1, borderColor: "divider", borderRadius: 1.5 }}
         >
-          &#8634;
-        </button>
-        <button
-          className="zoom-btn"
-          type="button"
+          <RestartAltIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
           aria-label="Zoom in"
           onClick={() =>
             setZoomIndex((i) => Math.min(ZOOM_LEVELS.length - 1, i + 1))
           }
+          sx={{ border: 1, borderColor: "divider", borderRadius: 1.5 }}
         >
-          +
-        </button>
-      </div>
+          <AddIcon fontSize="small" />
+        </IconButton>
+      </Stack>
 
-      <div
-        className={"diagram-scroll" + (dragging ? " grabbing" : "")}
+      <Box
         ref={scrollRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
+        sx={{
+          overflow: "auto",
+          maxHeight: "78vh",
+          display: "flex",
+          justifyContent: "center",
+          px: 0.5,
+          pt: 1.25,
+          pb: 2.5,
+          cursor: dragging ? "grabbing" : "grab",
+        }}
       >
         <svg
           className={"wheel-svg" + (mode === "trace" ? " has-selection" : "")}
@@ -373,7 +390,7 @@ export default function Diagram({
             />
           </g>
         </svg>
-      </div>
+      </Box>
     </>
   );
 }
