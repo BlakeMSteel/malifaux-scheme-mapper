@@ -23,6 +23,9 @@ const HOP_EDGE_OPACITY = [0, 1, 0.7, 0.45];
 const HOP_EDGE_WIDTH = [0, 2.6, 2, 1.5];
 
 const MAX_WIDTH = 800;
+// Below this, node labels stop being legible if we keep shrinking to fit —
+// better to hold this floor and let the page scroll horizontally.
+const MIN_WIDTH = 640;
 
 interface DiagramProps {
   selectedId: string | null;
@@ -296,14 +299,23 @@ export default function Diagram({
       onClick={onBackgroundClick}
       sx={{
         display: "flex",
-        justifyContent: "center",
+        // Centering a child wider than its container clips the start of
+        // the overflow (you'd need to scroll left/up from a centered
+        // position to see it) — left-align instead wherever the diagram
+        // might overflow (its MIN_WIDTH floor vs. a narrow viewport).
+        justifyContent: { xs: "flex-start", md: "center" },
         pt: 1.25,
         pb: 2.5,
       }}
     >
       <svg
         className={"wheel-svg" + (mode === "trace" ? " has-selection" : "")}
-        style={{ width: "100%", maxWidth: MAX_WIDTH, height: "auto" }}
+        style={{
+          width: "100%",
+          minWidth: MIN_WIDTH,
+          maxWidth: MAX_WIDTH,
+          height: "auto",
+        }}
         viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
         role="img"
         aria-label="Circular map of all 21 schemes: the outer ring is the discovered Hamiltonian cycle, and inner/outer curves are every other next-available link."

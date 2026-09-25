@@ -105,30 +105,44 @@ export default function App() {
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
       <AppBar position="sticky" color="default" elevation={1}>
         <Toolbar variant="dense" sx={{ minHeight: TOOLBAR_HEIGHT }}>
-          <Typography
-            variant="subtitle1"
-            sx={{ fontWeight: 700, letterSpacing: 0, color: "#5aa348" }}
+          <Box
+            component="a"
+            href="https://blakesteel.com"
+            sx={{ textDecoration: "none" }}
           >
-            Malifaux Scheme Mapper
-          </Typography>
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 700, letterSpacing: 0, color: "#5aa348" }}
+            >
+              Malifaux Scheme Mapper
+            </Typography>
+          </Box>
         </Toolbar>
       </AppBar>
 
-      <Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         <Box
           component="aside"
           sx={{
-            width: 380,
+            width: { xs: "100%", md: 380 },
             flexShrink: 0,
-            borderRight: 1,
+            borderRight: { xs: 0, md: 1 },
+            borderBottom: { xs: 1, md: 0 },
             borderColor: "divider",
             bgcolor: "grey.50",
-            p: 2.5,
-            position: "sticky",
+            p: { xs: 1.5, sm: 2.5 },
+            position: { xs: "static", md: "sticky" },
             top: TOOLBAR_HEIGHT,
             alignSelf: "flex-start",
-            height: `calc(100dvh - ${TOOLBAR_HEIGHT}px)`,
-            overflowY: "auto",
+            height: { xs: "auto", md: `calc(100dvh - ${TOOLBAR_HEIGHT}px)` },
+            overflowY: { xs: "visible", md: "auto" },
           }}
         >
           <ReferenceIndex
@@ -146,15 +160,18 @@ export default function App() {
           />
         </Box>
 
-        <Box component="main" sx={{ flex: 1, minWidth: 0, p: 3 }}>
-          <Box component="header" sx={{ mb: 3 }}>
+        <Box
+          component="main"
+          sx={{ flex: 1, minWidth: 0, p: { xs: 1.5, sm: 3 } }}
+        >
+          <Box component="header" sx={{ mb: { xs: 1.5, sm: 3 } }}>
             <Legend />
           </Box>
 
           <Box
             component="section"
             aria-label="Scheme link diagram"
-            sx={{ position: "relative" }}
+            sx={{ position: "relative", overflowX: "auto" }}
           >
             <Diagram
               selectedId={selectedId}

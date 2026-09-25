@@ -192,6 +192,7 @@ export default function SchemeListItem({
             onToggleExpand(scheme.id);
           }}
           sx={{
+            p: { xs: 1, sm: 0.5 },
             transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
             transition: "transform 0.15s ease",
           }}
@@ -230,8 +231,9 @@ export default function SchemeListItem({
                 ev.stopPropagation();
                 onToggleSource(scheme.id);
               }}
-              sx={
-                sourceIndex !== -1
+              sx={{
+                p: { xs: 1, sm: 0.5 },
+                ...(sourceIndex !== -1
                   ? {
                       bgcolor: `var(--target-${sourceIndex})`,
                       color: "#fff",
@@ -240,8 +242,8 @@ export default function SchemeListItem({
                         opacity: 0.85,
                       },
                     }
-                  : undefined
-              }
+                  : undefined),
+              }}
             >
               <CallSplitIcon fontSize="small" />
             </IconButton>
@@ -260,8 +262,9 @@ export default function SchemeListItem({
                 ev.stopPropagation();
                 onToggleAim(scheme.id);
               }}
-              sx={
-                targetIndex !== -1
+              sx={{
+                p: { xs: 1, sm: 0.5 },
+                ...(targetIndex !== -1
                   ? {
                       background: targetButtonBg,
                       color: "#fff",
@@ -270,8 +273,8 @@ export default function SchemeListItem({
                         opacity: 0.85,
                       },
                     }
-                  : undefined
-              }
+                  : undefined),
+              }}
             >
               <GpsFixedIcon fontSize="small" />
             </IconButton>
