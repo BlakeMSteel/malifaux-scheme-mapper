@@ -44,6 +44,21 @@ export function closestMatch(
   return best;
 }
 
+/** Indices of every source whose forward distance map reaches `id` within
+ * the budget — i.e. every selected source that can actually get here, not
+ * just the closest one. Used to color a target node by the source(s) that
+ * lead to it, rather than by its own arbitrary position in the list. */
+export function reachingSourceIndices(
+  id: string,
+  distMaps: (Record<string, number> | null)[],
+): number[] {
+  const out: number[] = [];
+  for (let ti = 0; ti < distMaps.length; ti++) {
+    if (distMaps[ti]?.[id] !== undefined) out.push(ti);
+  }
+  return out;
+}
+
 export interface HopBadge {
   key: string;
   label: string;

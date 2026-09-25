@@ -12,7 +12,25 @@ import GpsFixedIcon from "@mui/icons-material/GpsFixed";
 import CallSplitIcon from "@mui/icons-material/CallSplit";
 import { CAT_LABEL, type Scheme } from "../data/schemes";
 import { byId, incoming, type PathUnion } from "../lib/graph";
-import { hopBadges, schemeRowState, type AimMode } from "../lib/badges";
+import {
+  hopBadges,
+  reachingSourceIndices,
+  schemeRowState,
+  type AimMode,
+} from "../lib/badges";
+
+/** A solid color, or (for 2+ colors) a hard-stop CSS gradient split evenly
+ * between them — the button equivalent of the diagram's split-fill target
+ * nodes. */
+function splitBackground(colors: string[]): string {
+  if (colors.length <= 1) return colors[0] ?? "var(--target-0)";
+  const n = colors.length;
+  const stops = colors.flatMap((c, i) => [
+    `${c} ${(i / n) * 100}%`,
+    `${c} ${((i + 1) / n) * 100}%`,
+  ]);
+  return `linear-gradient(90deg, ${stops.join(", ")})`;
+}
 
 function badgeSx(color: string | undefined) {
   return {
@@ -109,6 +127,15 @@ export default function SchemeListItem({
     targetForwardDistMaps,
   );
 
+  const targetReach =
+    mode === "combined" ? reachingSourceIndices(scheme.id, distMaps) : [];
+  const targetButtonBg =
+    targetIndex !== -1
+      ? targetReach.length === 0
+        ? `var(--target-${targetIndex})`
+        : splitBackground(targetReach.map((si) => `var(--target-${si})`))
+      : undefined;
+
   const badges = hopBadges(
     scheme.id,
     mode,
@@ -187,7 +214,11 @@ export default function SchemeListItem({
 
         <Stack direction="row" spacing={0.25}>
           <Badge
-            badgeContent={rowState.sourceBadge}
+            badgeContent={
+              sourceIndex === -1 && sourcesFull
+                ? undefined
+                : rowState.sourceBadge
+            }
             sx={badgeSx(rowState.sourceBadgeColor)}
           >
             <IconButton
@@ -232,10 +263,10 @@ export default function SchemeListItem({
               sx={
                 targetIndex !== -1
                   ? {
-                      bgcolor: `var(--target-${targetIndex})`,
+                      background: targetButtonBg,
                       color: "#fff",
                       "&:hover": {
-                        bgcolor: `var(--target-${targetIndex})`,
+                        background: targetButtonBg,
                         opacity: 0.85,
                       },
                     }

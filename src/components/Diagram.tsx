@@ -2,7 +2,11 @@ import { useMemo } from "react";
 import { Box } from "@mui/material";
 import { SCHEMES } from "../data/schemes";
 import { byId, EDGES, incoming, type PathUnion } from "../lib/graph";
-import { closestMatch, type AimMode } from "../lib/badges";
+import {
+  closestMatch,
+  reachingSourceIndices,
+  type AimMode,
+} from "../lib/badges";
 import {
   CENTER,
   NODE_LAYOUT,
@@ -54,11 +58,24 @@ export default function Diagram({
             ? "fromGradient"
             : "none";
 
+  // Which selected sources can actually reach each selected target, within
+  // budget — used to color a target by its reaching source(s) rather than
+  // by its own arbitrary position in the targets list.
+  const targetReach = useMemo(() => {
+    const out: Record<string, number[]> = {};
+    if (mode !== "combined") return out;
+    targets.forEach((t) => {
+      out[t] = reachingSourceIndices(t, distMaps);
+    });
+    return out;
+  }, [mode, targets, distMaps]);
+
   const nodeVisual = useMemo(() => {
     const out: Record<
       string,
       {
         fill?: string;
+        labelFill?: string;
         opacity?: number;
         r?: number;
         stroke?: string;
@@ -130,8 +147,16 @@ export default function Diagram({
         const ti = targets.indexOf(s.id);
         const si = sources.indexOf(s.id);
         if (ti !== -1) {
+          const reach = targetReach[s.id] ?? [];
+          const fill =
+            reach.length === 0
+              ? `var(--target-${ti})` // no selected source reaches it within budget
+              : reach.length === 1
+                ? `var(--target-${reach[0]})`
+                : `url(#target-split-${s.id})`;
           out[s.id] = {
-            fill: `var(--target-${ti})`,
+            fill,
+            labelFill: reach.length >= 2 ? "var(--ink)" : fill,
             opacity: 1,
             r: 10,
             stroke: "var(--ink)",
@@ -154,7 +179,15 @@ export default function Diagram({
       });
     }
     return out;
-  }, [mode, distMaps, targets, sources, pathUnion, targetBackwardDistMaps]);
+  }, [
+    mode,
+    distMaps,
+    targets,
+    sources,
+    pathUnion,
+    targetBackwardDistMaps,
+    targetReach,
+  ]);
 
   const edgeVisual = useMemo(() => {
     const out: Record<
@@ -294,6 +327,35 @@ export default function Diagram({
               />
             </marker>
           ))}
+          {targets
+            .filter((t) => (targetReach[t]?.length ?? 0) >= 2)
+            .map((t) => {
+              const colors = targetReach[t].map((si) => `var(--target-${si})`);
+              const n = colors.length;
+              return (
+                <linearGradient
+                  key={`grad-${t}`}
+                  id={`target-split-${t}`}
+                  x1="0"
+                  y1="0"
+                  x2="1"
+                  y2="0"
+                >
+                  {colors.flatMap((c, i) => [
+                    <stop
+                      key={`${i}-start`}
+                      offset={`${(i / n) * 100}%`}
+                      stopColor={c}
+                    />,
+                    <stop
+                      key={`${i}-end`}
+                      offset={`${((i + 1) / n) * 100}%`}
+                      stopColor={c}
+                    />,
+                  ])}
+                </linearGradient>
+              );
+            })}
         </defs>
 
         <g className="chords">
@@ -389,7 +451,10 @@ export default function Diagram({
                   y={layout.labelY}
                   textAnchor={layout.labelAnchor}
                   transform={`rotate(${layout.labelRotation.toFixed(1)} ${layout.labelX.toFixed(1)} ${layout.labelY.toFixed(1)})`}
-                  style={{ opacity: nv?.opacity, fill: nv?.fill }}
+                  style={{
+                    opacity: nv?.opacity,
+                    fill: nv?.labelFill ?? nv?.fill,
+                  }}
                 >
                   {s.name}
                 </text>

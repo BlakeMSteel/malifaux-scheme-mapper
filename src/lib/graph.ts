@@ -140,22 +140,18 @@ export function computePathUnion(ids: string[]): PathUnion {
   return unionFromChains(matching);
 }
 
-/** Union of every simple chain (<=4 schemes) where at least one of the given
- * sources leads to ALL of the given targets — i.e. some source appears
- * before every target in the chain, so the chain genuinely represents a
- * source reaching that full set of targets (order among the targets
- * themselves doesn't matter, same as computePathUnion). */
+/** Union of every simple chain (<=4 schemes) that STARTS at one of the given
+ * sources and contains ALL of the given targets — the chain's origin must
+ * actually be a selected source, not just have one appear somewhere before
+ * the target(s) (order among the targets themselves doesn't matter, same as
+ * computePathUnion). */
 export function computeSourceTargetUnion(
   sources: string[],
   targets: string[],
 ): PathUnion {
   const matching = ALL_CHAINS.filter((chain) => {
-    if (!targets.every((t) => chain.includes(t))) return false;
-    const minTargetIdx = Math.min(...targets.map((t) => chain.indexOf(t)));
-    return sources.some((s) => {
-      const si = chain.indexOf(s);
-      return si !== -1 && si < minTargetIdx;
-    });
+    if (!sources.includes(chain[0])) return false;
+    return targets.every((t) => chain.includes(t));
   });
   return unionFromChains(matching);
 }
