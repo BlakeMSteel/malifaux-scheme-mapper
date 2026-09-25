@@ -101,26 +101,16 @@ export function hopBadges(
     // target — pathUnion already includes chains that extend beyond a
     // target as long as the whole thing still fits the 4-scheme-from-source
     // cap (computeSourceTargetUnion draws from ALL_CHAINS, which never
-    // generates chains longer than that). A separate unconstrained
-    // forward-from-target lookup would ignore how much of that budget the
-    // source→target leg already spent, so it isn't used here.
+    // generates chains longer than that). Anything not in pathUnion isn't
+    // part of a chain that reaches EVERY selected target from a source, so
+    // it's just not connected here — no fallback against a single target's
+    // backward distance, which would only require reaching one of them.
     if (pathUnion?.nodeSet.has(id)) {
       return [
         {
           key: "chain",
           label: "on the way from a source to the target(s)",
           colorVar: "var(--ink)",
-        },
-      ];
-    }
-    const back = closestMatch(id, targets.length, targetBackwardDistMaps);
-    if (back) {
-      const targetName = byId[targets[back.ti]].name;
-      return [
-        {
-          key: "back",
-          label: `${back.dist} ${back.dist === 1 ? "hop" : "hops"} → ${targetName}`,
-          colorVar: `var(--target-${back.ti})`,
         },
       ];
     }
@@ -243,19 +233,14 @@ export function schemeRowState(
   if (mode === "combined") {
     if (targets.includes(id) || sources.includes(id)) return {};
     // On-chain rows (including ones past a target) are budget-checked
-    // already by pathUnion — see the note in hopBadges. No independent
-    // "beyond" gradient here; it would ignore the budget the source→target
-    // leg already spent.
+    // already by pathUnion — see the note in hopBadges. Everything else is
+    // dimmed, full stop: no fallback tint/badge against a single target's
+    // backward distance, which would only require reaching one of the
+    // selected targets rather than all of them.
     if (pathUnion?.nodeSet.has(id)) {
       return { bg: `rgba(${GREEN_RGB},0.16)` };
     }
-    const back = closestMatch(id, targets.length, targetBackwardDistMaps);
-    if (!back) return { dim: true };
-    return {
-      bg: `rgba(${GREEN_RGB},0.06)`,
-      sourceBadge: back.dist,
-      sourceBadgeColor: `var(--target-${back.ti})`,
-    };
+    return { dim: true };
   }
 
   if (mode === "toGradient") {

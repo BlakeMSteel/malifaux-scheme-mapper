@@ -118,18 +118,25 @@ export interface PathUnion {
   matchCount: number;
   nodeSet: Set<string>;
   edgeSet: Set<string>;
+  /** Every scheme that's the FIRST scheme of at least one qualifying
+   * chain — i.e. one you could actually start from and still reach the
+   * rest within the budget, as opposed to one that only ever shows up
+   * partway through a chain that began somewhere else. */
+  startSet: Set<string>;
 }
 
 function unionFromChains(chains: string[][]): PathUnion {
   const nodeSet = new Set<string>();
   const edgeSet = new Set<string>();
+  const startSet = new Set<string>();
   chains.forEach((chain) => {
     chain.forEach((id) => nodeSet.add(id));
+    startSet.add(chain[0]);
     for (let i = 0; i < chain.length - 1; i++) {
       edgeSet.add(chain[i] + ">" + chain[i + 1]);
     }
   });
-  return { matchCount: chains.length, nodeSet, edgeSet };
+  return { matchCount: chains.length, nodeSet, edgeSet, startSet };
 }
 
 /** Union of every simple chain (<=4 schemes) that contains ALL given ids. */

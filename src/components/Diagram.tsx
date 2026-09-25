@@ -121,6 +121,10 @@ export default function Diagram({
         }
       });
     } else if (mode === "toIntersect") {
+      // With a graph this connected, "on some qualifying chain" can cover
+      // most of it — so distinguish schemes you could actually START a
+      // chain from (hollow ring) from ones that only ever show up
+      // partway through a chain that began somewhere else (solid dot).
       SCHEMES.forEach((s) => {
         const ti = targets.indexOf(s.id);
         if (ti !== -1) {
@@ -130,6 +134,14 @@ export default function Diagram({
             r: 10,
             stroke: "var(--ink)",
             strokeWidth: 3,
+          };
+        } else if (pathUnion?.startSet.has(s.id)) {
+          out[s.id] = {
+            fill: "#fff",
+            opacity: 1,
+            r: 8,
+            stroke: "var(--ink)",
+            strokeWidth: 2.5,
           };
         } else if (pathUnion?.nodeSet.has(s.id)) {
           out[s.id] = { fill: "var(--ink)", opacity: 1, r: 8 };
