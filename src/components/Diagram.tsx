@@ -138,6 +138,7 @@ export default function Diagram({
         } else if (pathUnion?.startSet.has(s.id)) {
           out[s.id] = {
             fill: "#fff",
+            labelFill: "var(--ink)",
             opacity: 1,
             r: 8,
             stroke: "var(--ink)",
