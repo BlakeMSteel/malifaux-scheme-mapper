@@ -120,18 +120,42 @@ export interface PathUnion {
   edgeSet: Set<string>;
 }
 
-/** Union of every simple chain (<=4 schemes) that contains ALL given ids. */
-export function computePathUnion(ids: string[]): PathUnion {
-  const matching = ALL_CHAINS.filter((chain) =>
-    ids.every((id) => chain.includes(id)),
-  );
+function unionFromChains(chains: string[][]): PathUnion {
   const nodeSet = new Set<string>();
   const edgeSet = new Set<string>();
-  matching.forEach((chain) => {
+  chains.forEach((chain) => {
     chain.forEach((id) => nodeSet.add(id));
     for (let i = 0; i < chain.length - 1; i++) {
       edgeSet.add(chain[i] + ">" + chain[i + 1]);
     }
   });
-  return { matchCount: matching.length, nodeSet, edgeSet };
+  return { matchCount: chains.length, nodeSet, edgeSet };
+}
+
+/** Union of every simple chain (<=4 schemes) that contains ALL given ids. */
+export function computePathUnion(ids: string[]): PathUnion {
+  const matching = ALL_CHAINS.filter((chain) =>
+    ids.every((id) => chain.includes(id)),
+  );
+  return unionFromChains(matching);
+}
+
+/** Union of every simple chain (<=4 schemes) where at least one of the given
+ * sources leads to ALL of the given targets — i.e. some source appears
+ * before every target in the chain, so the chain genuinely represents a
+ * source reaching that full set of targets (order among the targets
+ * themselves doesn't matter, same as computePathUnion). */
+export function computeSourceTargetUnion(
+  sources: string[],
+  targets: string[],
+): PathUnion {
+  const matching = ALL_CHAINS.filter((chain) => {
+    if (!targets.every((t) => chain.includes(t))) return false;
+    const minTargetIdx = Math.min(...targets.map((t) => chain.indexOf(t)));
+    return sources.some((s) => {
+      const si = chain.indexOf(s);
+      return si !== -1 && si < minTargetIdx;
+    });
+  });
+  return unionFromChains(matching);
 }

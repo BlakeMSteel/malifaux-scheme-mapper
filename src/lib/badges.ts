@@ -5,29 +5,37 @@ import { byId, type PathUnion } from "./graph";
 // alternative starting points (you only ever play from one), so they're
 // always shown as independent reachability, merged by picking whichever
 // origin gets there fastest.
+//
+// "combined" is what happens when sources and targets are active together:
+// it shows which selected sources can reach ALL the selected targets (a
+// shared connecting chain, like toIntersect), plus — independently — where
+// those targets lead onward from there (like fromGradient, seeded by the
+// targets instead of the sources).
 export type AimMode =
   | "none"
   | "trace"
   | "toGradient"
   | "toIntersect"
-  | "fromGradient";
+  | "fromGradient"
+  | "combined";
 
 export interface BestMatch {
   ti: number;
   dist: number;
 }
 
-/** Which selected source reaches `id` fastest (smallest hop count). Written
- * as a plain loop rather than a closure-mutated `let` — TS's control-flow
- * narrowing doesn't survive a `let` being reassigned inside a nested
- * `.forEach` callback and then read afterward. */
-export function bestSourceMatch(
+/** Which of N distance maps reaches `id` fastest (smallest hop count).
+ * Generic over what the maps are seeded by — sources, or targets in either
+ * direction. Written as a plain loop rather than a closure-mutated `let` —
+ * TS's control-flow narrowing doesn't survive a `let` being reassigned
+ * inside a nested `.forEach` callback and then read afterward. */
+export function closestMatch(
   id: string,
-  sourceCount: number,
+  count: number,
   distMaps: (Record<string, number> | null)[],
 ): BestMatch | null {
   let best: BestMatch | null = null;
-  for (let ti = 0; ti < sourceCount; ti++) {
+  for (let ti = 0; ti < count; ti++) {
     const d = distMaps[ti]?.[id];
     if (d !== undefined && (best === null || d < best.dist)) {
       best = { ti, dist: d };
@@ -50,7 +58,60 @@ export function hopBadges(
   sources: string[],
   distMaps: (Record<string, number> | null)[],
   pathUnion: PathUnion | null,
+  targetBackwardDistMaps: (Record<string, number> | null)[],
+  targetForwardDistMaps: (Record<string, number> | null)[],
 ): HopBadge[] {
+  if (mode === "combined") {
+    const ti = targets.indexOf(id);
+    if (ti !== -1) {
+      return [
+        {
+          key: "target",
+          label: "selected target",
+          colorVar: `var(--target-${ti})`,
+        },
+      ];
+    }
+    const si = sources.indexOf(id);
+    if (si !== -1) {
+      return [
+        {
+          key: "source",
+          label: "selected source",
+          colorVar: `var(--target-${si})`,
+        },
+      ];
+    }
+    // "On the way" covers both between source and target, and past the
+    // target — pathUnion already includes chains that extend beyond a
+    // target as long as the whole thing still fits the 4-scheme-from-source
+    // cap (computeSourceTargetUnion draws from ALL_CHAINS, which never
+    // generates chains longer than that). A separate unconstrained
+    // forward-from-target lookup would ignore how much of that budget the
+    // source→target leg already spent, so it isn't used here.
+    if (pathUnion?.nodeSet.has(id)) {
+      return [
+        {
+          key: "chain",
+          label: "on the way from a source to the target(s)",
+          colorVar: "var(--ink)",
+        },
+      ];
+    }
+    const back = closestMatch(id, targets.length, targetBackwardDistMaps);
+    if (back) {
+      const targetName = byId[targets[back.ti]].name;
+      return [
+        {
+          key: "back",
+          label: `${back.dist} ${back.dist === 1 ? "hop" : "hops"} → ${targetName}`,
+          colorVar: `var(--target-${back.ti})`,
+        },
+      ];
+    }
+    return [{ key: "none", label: "not connected here", muted: true }];
+  }
+
   if (mode === "toIntersect") {
     const ti = targets.indexOf(id);
     if (ti !== -1) {
@@ -75,17 +136,37 @@ export function hopBadges(
   }
 
   if (mode === "toGradient") {
-    const dm = distMaps[0];
-    const d = dm?.[id];
-    if (d === undefined) {
+    const back = targetBackwardDistMaps[0]?.[id];
+    const fwd = targetForwardDistMaps[0]?.[id];
+    if (back === undefined && fwd === undefined) {
       return [{ key: "oor", label: "out of reach within 3 hops", muted: true }];
     }
+    if (back === 0) {
+      return [
+        {
+          key: "dist",
+          label: "this is your target",
+          colorVar: "var(--target-0)",
+        },
+      ];
+    }
     const targetName = byId[targets[0]].name;
-    const label =
-      d === 0
-        ? "this is your target"
-        : `${d} ${d === 1 ? "hop" : "hops"} → ${targetName}`;
-    return [{ key: "dist", label, colorVar: "var(--target-0)" }];
+    const badges: HopBadge[] = [];
+    if (back !== undefined) {
+      badges.push({
+        key: "back",
+        label: `${back} ${back === 1 ? "hop" : "hops"} → ${targetName}`,
+        colorVar: "var(--target-0)",
+      });
+    }
+    if (fwd !== undefined) {
+      badges.push({
+        key: "fwd",
+        label: `${fwd} ${fwd === 1 ? "hop" : "hops"} from ${targetName}`,
+        colorVar: "var(--target-0)",
+      });
+    }
+    return badges;
   }
 
   if (mode === "fromGradient") {
@@ -120,12 +201,15 @@ export interface RowState {
   bg?: string;
   /** Dim the row's text (out of reach / not on any qualifying chain). */
   dim?: boolean;
-  /** Exact hop count shown as a small badge on the target/source button —
-   * only meaningful in gradient modes. */
-  badge?: number;
-  /** Color of that badge — matters once there are multiple origins, each
-   * with its own color. */
-  badgeColor?: string;
+  /** Hop count for the source button — "start here, this many hops to the
+   * target(s)" — only meaningful when a target is active. */
+  sourceBadge?: number;
+  sourceBadgeColor?: string;
+  /** Hop count for the target button — "aim here, this many hops from the
+   * source(s) / from the other target(s)" — meaningful whenever a source
+   * or target is active. */
+  targetBadge?: number;
+  targetBadgeColor?: string;
 }
 
 const GRADIENT_ROW_OPACITY = [0.22, 0.16, 0.1, 0.06];
@@ -138,24 +222,50 @@ export function schemeRowState(
   sources: string[],
   distMaps: (Record<string, number> | null)[],
   pathUnion: PathUnion | null,
+  targetBackwardDistMaps: (Record<string, number> | null)[],
+  targetForwardDistMaps: (Record<string, number> | null)[],
 ): RowState {
-  if (mode === "toGradient") {
-    const d = distMaps[0]?.[id];
-    if (d === undefined) return { dim: true };
+  if (mode === "combined") {
+    if (targets.includes(id) || sources.includes(id)) return {};
+    // On-chain rows (including ones past a target) are budget-checked
+    // already by pathUnion — see the note in hopBadges. No independent
+    // "beyond" gradient here; it would ignore the budget the source→target
+    // leg already spent.
+    if (pathUnion?.nodeSet.has(id)) {
+      return { bg: `rgba(${GREEN_RGB},0.16)` };
+    }
+    const back = closestMatch(id, targets.length, targetBackwardDistMaps);
+    if (!back) return { dim: true };
     return {
-      bg: `rgba(${GREEN_RGB},${GRADIENT_ROW_OPACITY[d]})`,
-      badge: d > 0 ? d : undefined,
-      badgeColor: "var(--target-0)",
+      bg: `rgba(${GREEN_RGB},0.06)`,
+      sourceBadge: back.dist,
+      sourceBadgeColor: `var(--target-${back.ti})`,
+    };
+  }
+
+  if (mode === "toGradient") {
+    const back = targetBackwardDistMaps[0]?.[id];
+    const fwd = targetForwardDistMaps[0]?.[id];
+    if (back === undefined && fwd === undefined) return { dim: true };
+    return {
+      bg:
+        back !== undefined
+          ? `rgba(${GREEN_RGB},${GRADIENT_ROW_OPACITY[back]})`
+          : `rgba(${GREEN_RGB},0.06)`,
+      sourceBadge: back && back > 0 ? back : undefined,
+      sourceBadgeColor: "var(--target-0)",
+      targetBadge: fwd && fwd > 0 ? fwd : undefined,
+      targetBadgeColor: "var(--target-0)",
     };
   }
 
   if (mode === "fromGradient") {
-    const best = bestSourceMatch(id, sources.length, distMaps);
+    const best = closestMatch(id, sources.length, distMaps);
     if (!best) return { dim: true };
     return {
       bg: `rgba(${GREEN_RGB},${GRADIENT_ROW_OPACITY[best.dist]})`,
-      badge: best.dist > 0 ? best.dist : undefined,
-      badgeColor: `var(--target-${best.ti})`,
+      targetBadge: best.dist > 0 ? best.dist : undefined,
+      targetBadgeColor: `var(--target-${best.ti})`,
     };
   }
 

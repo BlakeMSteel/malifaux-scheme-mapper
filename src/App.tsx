@@ -7,6 +7,7 @@ import {
   computeDistMap,
   computeDistMapForward,
   computePathUnion,
+  computeSourceTargetUnion,
 } from "./lib/graph";
 import type { AimMode } from "./lib/badges";
 
@@ -17,27 +18,48 @@ export default function App() {
   const [targets, setTargets] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
 
+  // Sources and targets coexist: picking both shows which sources can reach
+  // the targets, plus where the targets lead onward. Trace-select remains
+  // exclusive with both.
+  const combined = targets.length >= 1 && sources.length >= 1;
+
   const mode: AimMode = selectedId
     ? "trace"
-    : targets.length === 1
-      ? "toGradient"
-      : targets.length >= 2
-        ? "toIntersect"
-        : sources.length >= 1
-          ? "fromGradient"
-          : "none";
+    : combined
+      ? "combined"
+      : targets.length === 1
+        ? "toGradient"
+        : targets.length >= 2
+          ? "toIntersect"
+          : sources.length >= 1
+            ? "fromGradient"
+            : "none";
 
+  // Hops FROM each active source TO x (forward) — used for the "Aim From"
+  // gradient.
   const distMaps = useMemo(() => {
-    if (targets.length === 1) return [computeDistMap(targets[0])];
-    if (sources.length >= 1)
-      return sources.map((s) => computeDistMapForward(s));
-    return [];
-  }, [targets, sources]);
+    return sources.map((s) => computeDistMapForward(s));
+  }, [sources]);
+
+  // Hops FROM x TO each active target (backward) — "if I start here, how
+  // far to the target" — drives the source-button badge whenever a target
+  // is active.
+  const targetBackwardDistMaps = useMemo(() => {
+    return targets.map((t) => computeDistMap(t));
+  }, [targets]);
+
+  // Hops FROM each active target TO x (forward) — "if I aim here, how far
+  // is it from the target I already have" — drives the target-button
+  // badge and the "beyond the target" reachability.
+  const targetForwardDistMaps = useMemo(() => {
+    return targets.map((t) => computeDistMapForward(t));
+  }, [targets]);
 
   const pathUnion = useMemo(() => {
+    if (combined) return computeSourceTargetUnion(sources, targets);
     if (targets.length >= 2) return computePathUnion(targets);
     return null;
-  }, [targets]);
+  }, [combined, sources, targets]);
 
   function selectNode(id: string) {
     setTargets([]);
@@ -51,7 +73,6 @@ export default function App() {
 
   function toggleTarget(id: string) {
     setSelectedId(null);
-    setSources([]);
     setTargets((prev) => {
       if (prev.includes(id)) return prev.filter((t) => t !== id);
       if (prev.length >= 3) return prev;
@@ -61,7 +82,6 @@ export default function App() {
 
   function toggleSource(id: string) {
     setSelectedId(null);
-    setTargets([]);
     setSources((prev) => {
       if (prev.includes(id)) return prev.filter((t) => t !== id);
       if (prev.length >= 3) return prev;
@@ -118,6 +138,8 @@ export default function App() {
             mode={mode}
             distMaps={distMaps}
             pathUnion={pathUnion}
+            targetBackwardDistMaps={targetBackwardDistMaps}
+            targetForwardDistMaps={targetForwardDistMaps}
             onSelect={selectNode}
             onToggleAim={toggleTarget}
             onToggleSource={toggleSource}
@@ -142,6 +164,7 @@ export default function App() {
               sources={sources}
               distMaps={distMaps}
               pathUnion={pathUnion}
+              targetBackwardDistMaps={targetBackwardDistMaps}
             />
           </Box>
         </Box>

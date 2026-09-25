@@ -40,6 +40,8 @@ interface SchemeListItemProps {
   sources: string[];
   distMaps: (Record<string, number> | null)[];
   pathUnion: PathUnion | null;
+  targetBackwardDistMaps: (Record<string, number> | null)[];
+  targetForwardDistMaps: (Record<string, number> | null)[];
   onSelect: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onToggleAim: (id: string) => void;
@@ -89,6 +91,8 @@ export default function SchemeListItem({
   sources,
   distMaps,
   pathUnion,
+  targetBackwardDistMaps,
+  targetForwardDistMaps,
   onSelect,
   onToggleExpand,
   onToggleAim,
@@ -101,7 +105,10 @@ export default function SchemeListItem({
     sources,
     distMaps,
     pathUnion,
+    targetBackwardDistMaps,
+    targetForwardDistMaps,
   );
+
   const badges = hopBadges(
     scheme.id,
     mode,
@@ -109,6 +116,8 @@ export default function SchemeListItem({
     sources,
     distMaps,
     pathUnion,
+    targetBackwardDistMaps,
+    targetForwardDistMaps,
   );
   const catColor = `var(--cat-${scheme.cat})`;
 
@@ -178,8 +187,8 @@ export default function SchemeListItem({
 
         <Stack direction="row" spacing={0.25}>
           <Badge
-            badgeContent={mode === "fromGradient" ? rowState.badge : undefined}
-            sx={badgeSx(rowState.badgeColor)}
+            badgeContent={rowState.sourceBadge}
+            sx={badgeSx(rowState.sourceBadgeColor)}
           >
             <IconButton
               size="small"
@@ -208,8 +217,8 @@ export default function SchemeListItem({
           </Badge>
 
           <Badge
-            badgeContent={mode === "toGradient" ? rowState.badge : undefined}
-            sx={badgeSx(rowState.badgeColor)}
+            badgeContent={rowState.targetBadge}
+            sx={badgeSx(rowState.targetBadgeColor)}
           >
             <IconButton
               size="small"

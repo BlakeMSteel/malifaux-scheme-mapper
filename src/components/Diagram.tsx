@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Box } from "@mui/material";
 import { SCHEMES } from "../data/schemes";
 import { byId, EDGES, incoming, type PathUnion } from "../lib/graph";
-import { bestSourceMatch, type AimMode } from "../lib/badges";
+import { closestMatch, type AimMode } from "../lib/badges";
 import {
   CENTER,
   NODE_LAYOUT,
@@ -28,6 +28,7 @@ interface DiagramProps {
   sources: string[];
   distMaps: (Record<string, number> | null)[];
   pathUnion: PathUnion | null;
+  targetBackwardDistMaps: (Record<string, number> | null)[];
 }
 
 export default function Diagram({
@@ -38,16 +39,20 @@ export default function Diagram({
   sources,
   distMaps,
   pathUnion,
+  targetBackwardDistMaps,
 }: DiagramProps) {
+  const combined = targets.length >= 1 && sources.length >= 1;
   const mode: AimMode = selectedId
     ? "trace"
-    : targets.length === 1
-      ? "toGradient"
-      : targets.length >= 2
-        ? "toIntersect"
-        : sources.length >= 1
-          ? "fromGradient"
-          : "none";
+    : combined
+      ? "combined"
+      : targets.length === 1
+        ? "toGradient"
+        : targets.length >= 2
+          ? "toIntersect"
+          : sources.length >= 1
+            ? "fromGradient"
+            : "none";
 
   const nodeVisual = useMemo(() => {
     const out: Record<
@@ -58,11 +63,12 @@ export default function Diagram({
         r?: number;
         stroke?: string;
         strokeWidth?: number;
+        strokeDasharray?: string;
       }
     > = {};
 
     if (mode === "toGradient") {
-      const dm = distMaps[0];
+      const dm = targetBackwardDistMaps[0];
       SCHEMES.forEach((s) => {
         const d = dm?.[s.id];
         if (d === undefined) {
@@ -81,7 +87,7 @@ export default function Diagram({
       // Origins are independent, not a shared path — each node takes the
       // color/distance of whichever selected source reaches it fastest.
       SCHEMES.forEach((s) => {
-        const best = bestSourceMatch(s.id, sources.length, distMaps);
+        const best = closestMatch(s.id, sources.length, distMaps);
         if (!best) {
           out[s.id] = { opacity: 0.16, r: 6 };
         } else {
@@ -111,9 +117,44 @@ export default function Diagram({
           out[s.id] = { opacity: 0.13, r: 6 };
         }
       });
+    } else if (mode === "combined") {
+      // Precedence: the selected sources/targets themselves (solid ring =
+      // target, dashed ring = source, since they can share a color index) >
+      // the chain connecting a source to all targets — which already
+      // includes nodes past a target, as far as the 4-scheme-from-source
+      // cap allows (see the note in lib/badges.ts). No separate
+      // independent "beyond" gradient: that would grant a fresh 3-hop
+      // budget from the target regardless of how much the source→target
+      // leg already spent.
+      SCHEMES.forEach((s) => {
+        const ti = targets.indexOf(s.id);
+        const si = sources.indexOf(s.id);
+        if (ti !== -1) {
+          out[s.id] = {
+            fill: `var(--target-${ti})`,
+            opacity: 1,
+            r: 10,
+            stroke: "var(--ink)",
+            strokeWidth: 3,
+          };
+        } else if (si !== -1) {
+          out[s.id] = {
+            fill: `var(--target-${si})`,
+            opacity: 1,
+            r: 10,
+            stroke: "var(--ink)",
+            strokeWidth: 3,
+            strokeDasharray: "3 2",
+          };
+        } else if (pathUnion?.nodeSet.has(s.id)) {
+          out[s.id] = { fill: "var(--ink)", opacity: 1, r: 8 };
+        } else {
+          out[s.id] = { opacity: 0.13, r: 6 };
+        }
+      });
     }
     return out;
-  }, [mode, distMaps, targets, sources, pathUnion]);
+  }, [mode, distMaps, targets, sources, pathUnion, targetBackwardDistMaps]);
 
   const edgeVisual = useMemo(() => {
     const out: Record<
@@ -122,7 +163,7 @@ export default function Diagram({
     > = {};
 
     if (mode === "toGradient") {
-      const dm = distMaps[0];
+      const dm = targetBackwardDistMaps[0];
       EDGES.forEach((e) => {
         const key = e.source + ">" + e.target;
         const du = dm?.[e.source];
@@ -172,9 +213,18 @@ export default function Diagram({
           out[key] = { opacity: 0.04 };
         }
       });
+    } else if (mode === "combined") {
+      EDGES.forEach((e) => {
+        const key = e.source + ">" + e.target;
+        if (pathUnion?.edgeSet.has(key)) {
+          out[key] = { stroke: "var(--ink)", opacity: 1, strokeWidth: 2.6 };
+        } else {
+          out[key] = { opacity: 0.04 };
+        }
+      });
     }
     return out;
-  }, [mode, distMaps, sources, pathUnion]);
+  }, [mode, distMaps, sources, targets, pathUnion, targetBackwardDistMaps]);
 
   const connected = useMemo(() => {
     if (mode !== "trace" || !selectedId) return null;
@@ -330,6 +380,7 @@ export default function Diagram({
                     opacity: nv?.opacity,
                     stroke: nv?.stroke,
                     strokeWidth: nv?.strokeWidth,
+                    strokeDasharray: nv?.strokeDasharray,
                   }}
                 />
                 <text

@@ -14,6 +14,8 @@ interface ReferenceIndexProps {
   mode: AimMode;
   distMaps: (Record<string, number> | null)[];
   pathUnion: PathUnion | null;
+  targetBackwardDistMaps: (Record<string, number> | null)[];
+  targetForwardDistMaps: (Record<string, number> | null)[];
   onSelect: (id: string) => void;
   onToggleAim: (id: string) => void;
   onToggleSource: (id: string) => void;
@@ -26,6 +28,8 @@ export default function ReferenceIndex({
   mode,
   distMaps,
   pathUnion,
+  targetBackwardDistMaps,
+  targetForwardDistMaps,
   onSelect,
   onToggleAim,
   onToggleSource,
@@ -136,6 +140,8 @@ export default function ReferenceIndex({
               sources={sources}
               distMaps={distMaps}
               pathUnion={pathUnion}
+              targetBackwardDistMaps={targetBackwardDistMaps}
+              targetForwardDistMaps={targetForwardDistMaps}
               onSelect={onSelect}
               onToggleExpand={toggleExpand}
               onToggleAim={onToggleAim}
