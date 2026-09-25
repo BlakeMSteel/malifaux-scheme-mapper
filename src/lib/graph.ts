@@ -13,7 +13,7 @@ CYCLE.forEach((id, i) => {
 const CYCLE_LENGTH = CYCLE.length;
 const MAX_HOPS = 3;
 const MAX_CHAIN_LENGTH = 4;
-const MAX_SHORT_CHORD_STEPS = 5;
+export const MAX_SHORT_CHORD_STEPS = 4;
 
 export const incoming: Record<string, string[]> = {};
 SCHEMES.forEach((s) => {

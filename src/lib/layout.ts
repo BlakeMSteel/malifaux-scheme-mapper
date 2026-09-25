@@ -1,5 +1,5 @@
 import { CYCLE, SCHEMES } from "../data/schemes";
-import { cycleIndex } from "./graph";
+import { cycleIndex, MAX_SHORT_CHORD_STEPS } from "./graph";
 
 export const N = CYCLE.length;
 export const VIEWBOX = 1200;
@@ -12,7 +12,6 @@ export const NODE_RADIUS = 8;
 
 const MAX_RING_STEPS_APART = Math.floor(N / 2);
 const MIN_LONG_STEPS = 7;
-const MAX_SHORT_STEPS = 5;
 const EDGE_INSET = 14;
 
 function clamp01(v: number): number {
@@ -113,7 +112,7 @@ export function ringPath(a: string, b: string): string {
 
 export function shortChordPath(a: string, b: string, steps: number): string {
   const mid = shortArcMidIndex(a, b);
-  const t = clamp01((steps - 2) / (MAX_SHORT_STEPS - 2));
+  const t = clamp01((steps - 2) / (MAX_SHORT_CHORD_STEPS - 2));
   const bulge = SHORT_BAND_MIN + t * (SHORT_BAND_MAX - SHORT_BAND_MIN);
   const control = pointOnCircle(angleForIndex(mid), bulge);
   const p1 = stepToward(NODE_LAYOUT[a], control, EDGE_INSET);
