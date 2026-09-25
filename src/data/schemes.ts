@@ -16,9 +16,6 @@ export const CAT_LABEL: Record<Category, string> = {
   turn: "End of Turn",
 };
 
-// Pulled verbatim from the SCHEMES array hardcoded in the source artifact
-// (https://claude.ai/artifact/WzUXqb7LHJffziNMPop3Er), per the spec's
-// instruction to reuse that data rather than re-parsing the source PDFs.
 export const SCHEMES: Scheme[] = [
   {
     id: "AP",
@@ -243,8 +240,7 @@ export const SCHEMES: Scheme[] = [
   },
 ];
 
-// Discovered Hamiltonian cycle (spec section 1): a single ordering where each
-// scheme's `next` list includes the scheme immediately after it here.
+// Each scheme's `next` list includes the scheme immediately after it here.
 export const CYCLE: string[] = [
   "AP",
   "UA",

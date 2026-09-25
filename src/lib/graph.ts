@@ -10,9 +10,11 @@ CYCLE.forEach((id, i) => {
   cycleIndex[id] = i;
 });
 
-const N = CYCLE.length;
+const CYCLE_LENGTH = CYCLE.length;
+const MAX_HOPS = 3;
+const MAX_CHAIN_LENGTH = 4;
+const MAX_SHORT_CHORD_STEPS = 5;
 
-// Reverse lookup: which schemes list this scheme as a next-available option.
 export const incoming: Record<string, string[]> = {};
 SCHEMES.forEach((s) => {
   incoming[s.id] = [];
@@ -32,57 +34,54 @@ export interface Edge {
   steps: number;
 }
 
-/** Circular distance between two cycle positions (ring hops apart, both directions). */
-function ringSteps(a: string, b: string): number {
-  const d = Math.abs(cycleIndex[a] - cycleIndex[b]);
-  return Math.min(d, N - d);
+export function edgeKey(source: string, target: string): string {
+  return `${source}>${target}`;
 }
 
-// All 67 directed edges, classified per the spec:
-//  - ring: consecutive in the Hamiltonian cycle (drawn as the ring itself)
-//  - short: <=5 steps apart, not a ring edge (small arcs outside the ring)
-//  - long: >=7 steps apart (chords through the interior)
+function shortestRingDistance(a: string, b: string): number {
+  const d = Math.abs(cycleIndex[a] - cycleIndex[b]);
+  return Math.min(d, CYCLE_LENGTH - d);
+}
+
 export const EDGES: Edge[] = [];
 SCHEMES.forEach((s) => {
   s.next.forEach((n) => {
-    const isRingEdge = cycleIndex[n] === (cycleIndex[s.id] + 1) % N;
-    const steps = ringSteps(s.id, n);
-    EDGES.push({
-      source: s.id,
-      target: n,
-      kind: isRingEdge ? "ring" : steps <= 5 ? "short" : "long",
-      steps,
-    });
+    const isRingEdge = cycleIndex[n] === (cycleIndex[s.id] + 1) % CYCLE_LENGTH;
+    const steps = shortestRingDistance(s.id, n);
+    const kind: EdgeKind = isRingEdge
+      ? "ring"
+      : steps <= MAX_SHORT_CHORD_STEPS
+        ? "short"
+        : "long";
+    EDGES.push({ source: s.id, target: n, kind, steps });
   });
 });
 
-// Every simple directed chain of 1..4 schemes anywhere in the graph — small
-// enough (~1000) to brute-force once and reuse for every "Aim For" query.
-export const ALL_CHAINS: string[][] = (() => {
-  const out: string[][] = [];
-  function dfs(path: string[]) {
-    out.push(path.slice());
-    if (path.length === 4) return;
-    byId[path[path.length - 1]].next.forEach((nxt) => {
-      if (!path.includes(nxt)) {
-        path.push(nxt);
-        dfs(path);
+function enumerateAllSimpleChains(): string[][] {
+  const chains: string[][] = [];
+  function extendChain(path: string[]) {
+    chains.push(path.slice());
+    if (path.length === MAX_CHAIN_LENGTH) return;
+    byId[path[path.length - 1]].next.forEach((next) => {
+      if (!path.includes(next)) {
+        path.push(next);
+        extendChain(path);
         path.pop();
       }
     });
   }
-  SCHEMES.forEach((s) => dfs([s.id]));
-  return out;
-})();
+  SCHEMES.forEach((s) => extendChain([s.id]));
+  return chains;
+}
 
-/** BFS backward along "next" links, capped at 3 hops, from a single target:
- * dist[x] = hops needed to REACH the target starting from x. */
-export function computeDistMap(targetId: string): Record<string, number> {
+export const ALL_CHAINS: string[][] = enumerateAllSimpleChains();
+
+export function computeHopsToTarget(targetId: string): Record<string, number> {
   const dist: Record<string, number> = { [targetId]: 0 };
   const queue: string[] = [targetId];
   while (queue.length) {
     const cur = queue.shift()!;
-    if (dist[cur] >= 3) continue;
+    if (dist[cur] >= MAX_HOPS) continue;
     incoming[cur].forEach((p) => {
       if (dist[p] === undefined) {
         dist[p] = dist[cur] + 1;
@@ -93,17 +92,14 @@ export function computeDistMap(targetId: string): Record<string, number> {
   return dist;
 }
 
-/** BFS forward along "next" links, capped at 3 hops, from a single source:
- * dist[x] = hops needed to REACH x starting from the source. Mirror of
- * computeDistMap for the "Aim From" direction. */
-export function computeDistMapForward(
+export function computeHopsFromSource(
   sourceId: string,
 ): Record<string, number> {
   const dist: Record<string, number> = { [sourceId]: 0 };
   const queue: string[] = [sourceId];
   while (queue.length) {
     const cur = queue.shift()!;
-    if (dist[cur] >= 3) continue;
+    if (dist[cur] >= MAX_HOPS) continue;
     byId[cur].next.forEach((n) => {
       if (dist[n] === undefined) {
         dist[n] = dist[cur] + 1;
@@ -118,10 +114,6 @@ export interface PathUnion {
   matchCount: number;
   nodeSet: Set<string>;
   edgeSet: Set<string>;
-  /** Every scheme that's the FIRST scheme of at least one qualifying
-   * chain — i.e. one you could actually start from and still reach the
-   * rest within the budget, as opposed to one that only ever shows up
-   * partway through a chain that began somewhere else. */
   startSet: Set<string>;
 }
 
@@ -133,13 +125,12 @@ function unionFromChains(chains: string[][]): PathUnion {
     chain.forEach((id) => nodeSet.add(id));
     startSet.add(chain[0]);
     for (let i = 0; i < chain.length - 1; i++) {
-      edgeSet.add(chain[i] + ">" + chain[i + 1]);
+      edgeSet.add(edgeKey(chain[i], chain[i + 1]));
     }
   });
   return { matchCount: chains.length, nodeSet, edgeSet, startSet };
 }
 
-/** Union of every simple chain (<=4 schemes) that contains ALL given ids. */
 export function computePathUnion(ids: string[]): PathUnion {
   const matching = ALL_CHAINS.filter((chain) =>
     ids.every((id) => chain.includes(id)),
@@ -147,11 +138,6 @@ export function computePathUnion(ids: string[]): PathUnion {
   return unionFromChains(matching);
 }
 
-/** Union of every simple chain (<=4 schemes) that STARTS at one of the given
- * sources and contains ALL of the given targets — the chain's origin must
- * actually be a selected source, not just have one appear somewhere before
- * the target(s) (order among the targets themselves doesn't matter, same as
- * computePathUnion). */
 export function computeSourceTargetUnion(
   sources: string[],
   targets: string[],

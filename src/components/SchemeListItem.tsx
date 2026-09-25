@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Badge,
   Box,
@@ -11,17 +12,17 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import GpsFixedIcon from "@mui/icons-material/GpsFixed";
 import CallSplitIcon from "@mui/icons-material/CallSplit";
 import { CAT_LABEL, type Scheme } from "../data/schemes";
-import { byId, incoming, type PathUnion } from "../lib/graph";
+import { byId, incoming } from "../lib/graph";
 import {
   hopBadges,
   reachingSourceIndices,
   schemeRowState,
-  type AimMode,
+  type AimContext,
 } from "../lib/badges";
 
-/** A solid color, or (for 2+ colors) a hard-stop CSS gradient split evenly
- * between them — the button equivalent of the diagram's split-fill target
- * nodes. */
+const MAX_TARGETS = 3;
+const MAX_SOURCES = 3;
+
 function splitBackground(colors: string[]): string {
   if (colors.length <= 1) return colors[0] ?? "var(--target-0)";
   const n = colors.length;
@@ -45,25 +46,53 @@ function badgeSx(color: string | undefined) {
   };
 }
 
-interface SchemeListItemProps {
-  scheme: Scheme;
-  isActive: boolean;
-  expanded: boolean;
-  targetIndex: number;
-  targetsFull: boolean;
-  sourceIndex: number;
-  sourcesFull: boolean;
-  mode: AimMode;
-  targets: string[];
-  sources: string[];
-  distMaps: (Record<string, number> | null)[];
-  pathUnion: PathUnion | null;
-  targetBackwardDistMaps: (Record<string, number> | null)[];
-  targetForwardDistMaps: (Record<string, number> | null)[];
-  onSelect: (id: string) => void;
-  onToggleExpand: (id: string) => void;
-  onToggleAim: (id: string) => void;
-  onToggleSource: (id: string) => void;
+interface AimToggleButtonProps {
+  icon: ReactNode;
+  label: string;
+  isSelected: boolean;
+  listIsFull: boolean;
+  selectedBackground: string | undefined;
+  badgeContent: number | undefined;
+  badgeColor: string | undefined;
+  onToggle: () => void;
+}
+
+function AimToggleButton({
+  icon,
+  label,
+  isSelected,
+  listIsFull,
+  selectedBackground,
+  badgeContent,
+  badgeColor,
+  onToggle,
+}: AimToggleButtonProps) {
+  return (
+    <Badge badgeContent={badgeContent} sx={badgeSx(badgeColor)}>
+      <IconButton
+        size="small"
+        aria-label={label}
+        title={label}
+        disabled={!isSelected && listIsFull}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+        sx={{
+          p: { xs: 1, sm: 0.5 },
+          ...(isSelected
+            ? {
+                background: selectedBackground,
+                color: "#fff",
+                "&:hover": { background: selectedBackground, opacity: 0.85 },
+              }
+            : undefined),
+        }}
+      >
+        {icon}
+      </IconButton>
+    </Badge>
+  );
 }
 
 function ChipRow({ label, ids }: { label: string; ids: string[] }) {
@@ -96,56 +125,46 @@ function ChipRow({ label, ids }: { label: string; ids: string[] }) {
   );
 }
 
+interface SchemeListItemProps {
+  scheme: Scheme;
+  isActive: boolean;
+  expanded: boolean;
+  aim: AimContext;
+  onSelect: (id: string) => void;
+  onToggleExpand: (id: string) => void;
+  onToggleAim: (id: string) => void;
+  onToggleSource: (id: string) => void;
+}
+
 export default function SchemeListItem({
   scheme,
   isActive,
   expanded,
-  targetIndex,
-  targetsFull,
-  sourceIndex,
-  sourcesFull,
-  mode,
-  targets,
-  sources,
-  distMaps,
-  pathUnion,
-  targetBackwardDistMaps,
-  targetForwardDistMaps,
+  aim,
   onSelect,
   onToggleExpand,
   onToggleAim,
   onToggleSource,
 }: SchemeListItemProps) {
-  const rowState = schemeRowState(
-    scheme.id,
-    mode,
-    targets,
-    sources,
-    distMaps,
-    pathUnion,
-    targetBackwardDistMaps,
-    targetForwardDistMaps,
-  );
+  const targetIndex = aim.targets.indexOf(scheme.id);
+  const sourceIndex = aim.sources.indexOf(scheme.id);
+  const targetsFull = aim.targets.length >= MAX_TARGETS;
+  const sourcesFull = aim.sources.length >= MAX_SOURCES;
+
+  const rowState = schemeRowState(scheme.id, aim);
+  const badges = hopBadges(scheme.id, aim);
 
   const targetReach =
-    mode === "combined" ? reachingSourceIndices(scheme.id, distMaps) : [];
-  const targetButtonBg =
-    targetIndex !== -1
-      ? targetReach.length === 0
+    aim.mode === "combined"
+      ? reachingSourceIndices(scheme.id, aim.hopsFromSources)
+      : [];
+  const targetButtonBackground =
+    targetIndex === -1
+      ? undefined
+      : targetReach.length === 0
         ? `var(--target-${targetIndex})`
-        : splitBackground(targetReach.map((si) => `var(--target-${si})`))
-      : undefined;
+        : splitBackground(targetReach.map((si) => `var(--target-${si})`));
 
-  const badges = hopBadges(
-    scheme.id,
-    mode,
-    targets,
-    sources,
-    distMaps,
-    pathUnion,
-    targetBackwardDistMaps,
-    targetForwardDistMaps,
-  );
   const catColor = `var(--cat-${scheme.cat})`;
 
   return (
@@ -155,7 +174,7 @@ export default function SchemeListItem({
         borderLeftColor: catColor,
         borderBottom: 1,
         borderBottomColor: "divider",
-        bgcolor: isActive ? "action.selected" : rowState.bg,
+        bgcolor: isActive ? "action.selected" : rowState.rowTint,
       }}
     >
       <Stack
@@ -207,78 +226,40 @@ export default function SchemeListItem({
             flex: 1,
             fontWeight: isActive ? 700 : 600,
             py: 1,
-            opacity: rowState.dim ? 0.45 : 1,
+            opacity: rowState.isDimmed ? 0.45 : 1,
           }}
         >
           {scheme.name}
         </Typography>
 
         <Stack direction="row" spacing={0.25}>
-          <Badge
+          <AimToggleButton
+            icon={<CallSplitIcon fontSize="small" />}
+            label={`Use ${scheme.name} as a source`}
+            isSelected={sourceIndex !== -1}
+            listIsFull={sourcesFull}
+            selectedBackground={
+              sourceIndex !== -1 ? `var(--target-${sourceIndex})` : undefined
+            }
             badgeContent={
               sourceIndex === -1 && sourcesFull
                 ? undefined
-                : rowState.sourceBadge
+                : rowState.sourceButtonHopCount
             }
-            sx={badgeSx(rowState.sourceBadgeColor)}
-          >
-            <IconButton
-              size="small"
-              aria-label={`Use ${scheme.name} as a source`}
-              title={`Use ${scheme.name} as a source`}
-              disabled={sourceIndex === -1 && sourcesFull}
-              onClick={(ev) => {
-                ev.stopPropagation();
-                onToggleSource(scheme.id);
-              }}
-              sx={{
-                p: { xs: 1, sm: 0.5 },
-                ...(sourceIndex !== -1
-                  ? {
-                      bgcolor: `var(--target-${sourceIndex})`,
-                      color: "#fff",
-                      "&:hover": {
-                        bgcolor: `var(--target-${sourceIndex})`,
-                        opacity: 0.85,
-                      },
-                    }
-                  : undefined),
-              }}
-            >
-              <CallSplitIcon fontSize="small" />
-            </IconButton>
-          </Badge>
+            badgeColor={rowState.sourceButtonColor}
+            onToggle={() => onToggleSource(scheme.id)}
+          />
 
-          <Badge
-            badgeContent={rowState.targetBadge}
-            sx={badgeSx(rowState.targetBadgeColor)}
-          >
-            <IconButton
-              size="small"
-              aria-label={`Aim for ${scheme.name}`}
-              title={`Aim for ${scheme.name}`}
-              disabled={targetIndex === -1 && targetsFull}
-              onClick={(ev) => {
-                ev.stopPropagation();
-                onToggleAim(scheme.id);
-              }}
-              sx={{
-                p: { xs: 1, sm: 0.5 },
-                ...(targetIndex !== -1
-                  ? {
-                      background: targetButtonBg,
-                      color: "#fff",
-                      "&:hover": {
-                        background: targetButtonBg,
-                        opacity: 0.85,
-                      },
-                    }
-                  : undefined),
-              }}
-            >
-              <GpsFixedIcon fontSize="small" />
-            </IconButton>
-          </Badge>
+          <AimToggleButton
+            icon={<GpsFixedIcon fontSize="small" />}
+            label={`Aim for ${scheme.name}`}
+            isSelected={targetIndex !== -1}
+            listIsFull={targetsFull}
+            selectedBackground={targetButtonBackground}
+            badgeContent={rowState.targetButtonHopCount}
+            badgeColor={rowState.targetButtonColor}
+            onToggle={() => onToggleAim(scheme.id)}
+          />
         </Stack>
       </Stack>
 

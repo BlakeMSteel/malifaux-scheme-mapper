@@ -1,58 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
-import { AppBar, Box, Toolbar, Typography } from "@mui/material";
+import { Box } from "@mui/material";
+import Header, { TOOLBAR_HEIGHT } from "./components/Header";
 import Legend from "./components/Legend";
 import Diagram from "./components/Diagram";
 import ReferenceIndex from "./components/ReferenceIndex";
 import {
-  computeDistMap,
-  computeDistMapForward,
+  computeHopsFromSource,
+  computeHopsToTarget,
   computePathUnion,
   computeSourceTargetUnion,
 } from "./lib/graph";
-import type { AimMode } from "./lib/badges";
-
-const TOOLBAR_HEIGHT = 48;
+import { aimMode, type AimContext } from "./lib/badges";
 
 export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [targets, setTargets] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
 
-  // Sources and targets coexist: picking both shows which sources can reach
-  // the targets, plus where the targets lead onward. Trace-select remains
-  // exclusive with both.
   const combined = targets.length >= 1 && sources.length >= 1;
+  const mode = aimMode(selectedId, targets, sources);
 
-  const mode: AimMode = selectedId
-    ? "trace"
-    : combined
-      ? "combined"
-      : targets.length === 1
-        ? "toGradient"
-        : targets.length >= 2
-          ? "toIntersect"
-          : sources.length >= 1
-            ? "fromGradient"
-            : "none";
-
-  // Hops FROM each active source TO x (forward) — used for the "Aim From"
-  // gradient.
-  const distMaps = useMemo(() => {
-    return sources.map((s) => computeDistMapForward(s));
+  const hopsFromSources = useMemo(() => {
+    return sources.map((s) => computeHopsFromSource(s));
   }, [sources]);
 
-  // Hops FROM x TO each active target (backward) — "if I start here, how
-  // far to the target" — drives the source-button badge whenever a target
-  // is active.
-  const targetBackwardDistMaps = useMemo(() => {
-    return targets.map((t) => computeDistMap(t));
+  const hopsToTargets = useMemo(() => {
+    return targets.map((t) => computeHopsToTarget(t));
   }, [targets]);
 
-  // Hops FROM each active target TO x (forward) — "if I aim here, how far
-  // is it from the target I already have" — drives the target-button
-  // badge and the "beyond the target" reachability.
-  const targetForwardDistMaps = useMemo(() => {
-    return targets.map((t) => computeDistMapForward(t));
+  const hopsFromTargets = useMemo(() => {
+    return targets.map((t) => computeHopsFromSource(t));
   }, [targets]);
 
   const pathUnion = useMemo(() => {
@@ -60,6 +37,27 @@ export default function App() {
     if (targets.length >= 2) return computePathUnion(targets);
     return null;
   }, [combined, sources, targets]);
+
+  const aim: AimContext = useMemo(
+    () => ({
+      mode,
+      targets,
+      sources,
+      hopsFromSources,
+      pathUnion,
+      hopsToTargets,
+      hopsFromTargets,
+    }),
+    [
+      mode,
+      targets,
+      sources,
+      hopsFromSources,
+      pathUnion,
+      hopsToTargets,
+      hopsFromTargets,
+    ],
+  );
 
   function selectNode(id: string) {
     setTargets([]);
@@ -103,22 +101,7 @@ export default function App() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-      <AppBar position="sticky" color="default" elevation={1}>
-        <Toolbar variant="dense" sx={{ minHeight: TOOLBAR_HEIGHT }}>
-          <Box
-            component="a"
-            href="https://blakesteel.com"
-            sx={{ textDecoration: "none" }}
-          >
-            <Typography
-              variant="subtitle1"
-              sx={{ fontWeight: 700, letterSpacing: 0, color: "#5aa348" }}
-            >
-              Malifaux Scheme Mapper
-            </Typography>
-          </Box>
-        </Toolbar>
-      </AppBar>
+      <Header />
 
       <Box
         sx={{
@@ -147,13 +130,7 @@ export default function App() {
         >
           <ReferenceIndex
             selectedId={selectedId}
-            targets={targets}
-            sources={sources}
-            mode={mode}
-            distMaps={distMaps}
-            pathUnion={pathUnion}
-            targetBackwardDistMaps={targetBackwardDistMaps}
-            targetForwardDistMaps={targetForwardDistMaps}
+            aim={aim}
             onSelect={selectNode}
             onToggleAim={toggleTarget}
             onToggleSource={toggleSource}
@@ -179,9 +156,9 @@ export default function App() {
               onClearSelection={clearSelection}
               targets={targets}
               sources={sources}
-              distMaps={distMaps}
+              hopsFromSources={hopsFromSources}
               pathUnion={pathUnion}
-              targetBackwardDistMaps={targetBackwardDistMaps}
+              hopsToTargets={hopsToTargets}
             />
           </Box>
         </Box>
